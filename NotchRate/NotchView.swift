@@ -15,6 +15,8 @@ struct NotchView: View {
 
     @AppStorage(Pref.hoverDelay) private var hoverDelay = 0.3
     @AppStorage(Pref.staleHours) private var staleHours = 2.0
+    @AppStorage(Pref.showWeekly) private var showWeekly = false
+    @AppStorage(Pref.ringGauges) private var ringGauges = true
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hoverTask: Task<Void, Never>?
 
@@ -64,56 +66,111 @@ struct NotchView: View {
 
     private func collapsed(_ snap: UsageSnapshot, level: Level) -> some View {
         let geo = state.geometry
+        let stale = level == .stale
+        let session = stale ? .stale : Level(pct: snap.sessionUsedPct ?? 0)
+        let weekly = stale ? .stale : Level(pct: snap.weeklyUsedPct ?? 0)
+        // 14pt pads keep text clear of the bottom corner curves.
         return HStack(spacing: 0) {
-            dot(level).frame(width: geo.hasNotch ? geo.wingWidth : 30)
+            Group {
+                if showWeekly {
+                    bucket("5h", snap.sessionUsedPct, level: session).padding(.leading, geo.hasNotch ? 14 : 0)
+                } else {
+                    Circle().fill(session.color).frame(width: 8, height: 8)
+                }
+            }
+            .frame(width: geo.hasNotch ? geo.wingWidth : 30)
             if geo.hasNotch { Color.clear.frame(width: geo.notchWidth) }
-            pctText(snap.peakPct, level: level)
-                .padding(.trailing, geo.hasNotch ? 14 : 0)  // stay clear of the bottom corner curve
-                .frame(width: geo.hasNotch ? geo.wingWidth : nil, alignment: geo.hasNotch ? .center : .leading)
+            Group {
+                if showWeekly {
+                    bucket("7d", snap.weeklyUsedPct, level: weekly)
+                } else {
+                    pctText(snap.sessionUsedPct, stale: stale)
+                }
+            }
+            .padding(.trailing, geo.hasNotch ? 14 : 0)
+            .frame(width: geo.hasNotch ? geo.wingWidth : nil, alignment: geo.hasNotch ? .center : .leading)
         }
         .frame(height: geo.topHeight)
-        .opacity(level == .stale ? 0.5 : 1)
+        .opacity(stale ? 0.5 : 1)
     }
 
-    private func dot(_ level: Level) -> some View {
-        Circle().fill(level.color).frame(width: 8, height: 8)
+    /// Caption carries the color so no dot is needed.
+    private func bucket(_ label: String, _ pct: Double?, level: Level) -> some View {
+        HStack(spacing: 3) {
+            Text(label).font(.system(size: 9, weight: .bold, design: .rounded)).foregroundStyle(level.color)
+            pctText(pct, stale: level == .stale)
+        }
+        .lineLimit(1)
+        .minimumScaleFactor(0.4)
     }
 
-    private func pctText(_ pct: Double, level: Level) -> some View {
-        Text("\(Int(pct.rounded()))%")
+    private func pctText(_ pct: Double?, stale: Bool) -> some View {
+        Text(pct.map { "\(Int($0.rounded()))%" } ?? "—")
             .font(.system(size: 12, weight: .semibold, design: .rounded))
             .monospacedDigit()
             .lineLimit(1)
             .minimumScaleFactor(0.4)
-            .foregroundStyle(level == .stale ? .gray : .white)
+            .foregroundStyle(stale ? .gray : .white)
     }
 
     // MARK: expanded
 
     private func expanded(_ snap: UsageSnapshot, level: Level, now: Date) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+        let stale = level == .stale
+        return VStack(alignment: .leading, spacing: 10) {
             Color.clear.frame(height: state.geometry.topHeight)  // physical notch region
             HStack {
-                Text("Claude Code").font(.headline)
+                Text("Claude").font(.headline)
                 Spacer()
-                if level == .stale {
-                    Text("stale · \(relative(snap.lastUpdated, now: now)) ago").font(.caption).foregroundStyle(.gray)
-                }
+                Text("\(stale ? "stale" : "updated") · \(relative(snap.lastUpdated, now: now)) ago")
+                    .font(.caption).foregroundStyle(.gray)
             }
-            bar("Session", snap.sessionUsedPct, resets: snap.sessionResetsAt, now: now)
-            bar("Weekly", snap.weeklyUsedPct, resets: snap.weeklyResetsAt, now: now)
+            if ringGauges {
+                HStack(spacing: 0) {
+                    ring("Session", snap.sessionUsedPct, resets: snap.sessionResetsAt, now: now, stale: stale)
+                    ring("Weekly", snap.weeklyUsedPct, resets: snap.weeklyResetsAt, now: now, stale: stale)
+                }
+            } else {
+                bar("Session", snap.sessionUsedPct, resets: snap.sessionResetsAt, now: now)
+                bar("Weekly", snap.weeklyUsedPct, resets: snap.weeklyResetsAt, now: now)
+            }
+            Divider().overlay(.white.opacity(0.15))
             HStack {
-                Label(snap.costUsd.map { $0.formatted(.currency(code: "USD")) } ?? "—", systemImage: "dollarsign.circle")
+                Text(snap.costUsd.map { $0.formatted(.currency(code: "USD")) + " spent" } ?? "—")
                 Spacer()
-                Label("\(Int((snap.contextPct ?? 0).rounded()))% context", systemImage: "rectangle.stack")
+                Text("\(Int((snap.contextPct ?? 0).rounded()))% context")
+                Spacer()
+                Label("usage", systemImage: "arrow.up.right").labelStyle(.titleAndIcon)
             }
             .font(.caption).foregroundStyle(.secondary)
         }
         .padding(.horizontal, 16)
         .padding(.bottom, 12)
         .foregroundStyle(.white)
-        .opacity(level == .stale ? 0.6 : 1)
+        .opacity(stale ? 0.6 : 1)
         .transition(.opacity)
+    }
+
+    private func ring(_ title: String, _ pct: Double?, resets: Double?, now: Date, stale: Bool) -> some View {
+        let v = pct ?? 0
+        let color = stale ? Level.stale.color : Level(pct: v).color
+        return HStack(spacing: 10) {
+            ZStack {
+                Circle().stroke(.white.opacity(0.15), lineWidth: 5)
+                Circle().trim(from: 0, to: min(v, 100) / 100)
+                    .stroke(color, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                    .rotationEffect(.degrees(-90))
+                Text(pct == nil ? "—" : "\(Int(v.rounded()))")
+                    .font(.system(size: 11, weight: .bold, design: .rounded)).monospacedDigit()
+            }
+            .frame(width: 40, height: 40)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.caption).bold()
+                Text(v >= 100 ? "limit reached" : resets.map { "resets \(resetText($0, now: now))" } ?? "—")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func bar(_ title: String, _ pct: Double?, resets: Double?, now: Date) -> some View {

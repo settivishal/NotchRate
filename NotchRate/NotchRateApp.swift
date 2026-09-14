@@ -66,7 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func updateVisibility(screen: NSScreen?) {
-        if store.primary == nil || screen == nil { panel.orderOut(nil) } else { panel.orderFrontRegardless() }
+        if store.primary == nil || screen == nil || UserDefaults.standard.bool(forKey: Pref.hideBadge) { panel.orderOut(nil) } else { panel.orderFrontRegardless() }
     }
 
     /// Window grows before the expand animation and shrinks after the collapse one,

@@ -6,9 +6,12 @@ enum Pref {
     static let hoverDelay = "hoverDelay"       // Double seconds, default 0.3
     static let allDisplays = "allDisplays"     // Bool, default true
     static let wingWidth = "wingWidth"         // Double points, default 44
+    static let showWeekly = "showWeekly"       // Bool, default false: collapsed badge shows 5h and 7d
+    static let hideBadge = "hideBadge"         // Bool, default false: menu bar item only
+    static let ringGauges = "ringGauges"       // Bool, default true: expanded view uses rings, else bars
 
     static func register() {
-        UserDefaults.standard.register(defaults: [staleHours: 2.0, hoverDelay: 0.3, allDisplays: true, wingWidth: 44.0])
+        UserDefaults.standard.register(defaults: [staleHours: 2.0, hoverDelay: 0.3, allDisplays: true, wingWidth: 44.0, showWeekly: false, hideBadge: false, ringGauges: true])
     }
     static var staleAfter: TimeInterval { UserDefaults.standard.double(forKey: staleHours) * 3600 }
 }
@@ -18,6 +21,9 @@ struct SettingsView: View {
     @AppStorage(Pref.hoverDelay) private var hoverDelay = 0.3
     @AppStorage(Pref.allDisplays) private var allDisplays = true
     @AppStorage(Pref.wingWidth) private var wingWidth = 44.0
+    @AppStorage(Pref.showWeekly) private var showWeekly = false
+    @AppStorage(Pref.hideBadge) private var hideBadge = false
+    @AppStorage(Pref.ringGauges) private var ringGauges = true
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -27,7 +33,14 @@ struct SettingsView: View {
                     do { try on ? SMAppService.mainApp.register() : SMAppService.mainApp.unregister() }
                     catch { launchAtLogin = SMAppService.mainApp.status == .enabled }
                 }
-            Toggle("Follow mouse to every display", isOn: $allDisplays)
+            Toggle("Hide badge (menu bar only)", isOn: $hideBadge)
+            Toggle("Show weekly (7d) in badge", isOn: $showWeekly)
+            Picker("Expanded gauges", selection: $ringGauges) {
+                Text("Rings").tag(true)
+                Text("Bars").tag(false)
+            }
+            .pickerStyle(.segmented)
+            Toggle("Follow mouse to every display (pill on plain displays)", isOn: $allDisplays)
             Slider(value: $hoverDelay, in: 0...1, step: 0.05) {
                 Text("Hover delay: \(hoverDelay, format: .number.precision(.fractionLength(2)))s")
             }

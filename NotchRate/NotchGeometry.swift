@@ -3,8 +3,8 @@ import AppKit
 /// Per-screen sizing. Real notch: match its exact width/height so the black
 /// shape merges with it. No notch: a small pill hugging the menu bar.
 struct NotchGeometry {
-    static let pillWidth: CGFloat = 130
-    static let expandedSize = CGSize(width: 340, height: 150)
+    static var pillWidth: CGFloat { UserDefaults.standard.bool(forKey: Pref.showWeekly) ? 160 : 130 }
+    static var expandedSize: CGSize { CGSize(width: 340, height: UserDefaults.standard.bool(forKey: Pref.ringGauges) ? 122 : 150) }
 
     let screen: NSScreen
     let hasNotch: Bool
