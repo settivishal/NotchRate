@@ -4,13 +4,16 @@ import SwiftUI
 struct NotchRateApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
     @Environment(\.openSettings) private var openSettings
+    @AppStorage(Pref.menuBarText) private var menuBarText = false
 
     var body: some Scene {
-        MenuBarExtra("NotchRate", systemImage: "gauge.with.dots.needle.33percent") {
+        MenuBarExtra {
             Text(delegate.summary)
             Divider()
             Button("Settings…") { NSApp.activate(); openSettings() }
             Button("Quit NotchRate") { NSApp.terminate(nil) }
+        } label: {
+            if menuBarText { Text(delegate.summary) } else { Image(systemName: "gauge.with.dots.needle.33percent") }
         }
         Settings { SettingsView() }
     }
@@ -26,6 +29,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var poller: UsagePoller!
     private var collapseTask: Task<Void, Never>?
     private var previewing = false
+    private var hotkeyOpened = false
 
     var summary: String {
         guard let s = store?.primary else { return "No usage data yet" }
@@ -52,13 +56,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.contentView = NSHostingView(rootView: NotchView(store: store, state: state,
                                                               setExpanded: { [weak self] in self?.setExpanded($0) },
                                                               setPage: { [weak self] in self?.setPage($0) },
-                                                              refresh: { [weak self] in self?.refresh() }))
+                                                              refresh: { [weak self] in self?.refresh() },
+                                                              togglePin: { [weak self] in self?.togglePin() }))
+        HotKey.set(enabled: UserDefaults.standard.bool(forKey: Pref.hotkey)) { [weak self] in self?.toggleFromHotkey() }
 
         tracker = ScreenTracker(followMouse: UserDefaults.standard.bool(forKey: Pref.allDisplays)) { [weak self] in self?.move(to: $0) }
         NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
                 guard let self else { return }
                 self.tracker.setFollowMouse(UserDefaults.standard.bool(forKey: Pref.allDisplays))
+                HotKey.set(enabled: UserDefaults.standard.bool(forKey: Pref.hotkey)) { [weak self] in self?.toggleFromHotkey() }
                 if !self.previewing { self.move(to: self.tracker.current) }  // wing width may have changed
             }
         }
@@ -79,7 +86,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Window grows before the expand animation and shrinks after the collapse one,
     /// so the transparent hit area never blocks clicks while collapsed.
     private func setExpanded(_ on: Bool) {
-        if previewing && !on { return }  // settings slider is showing the card; ignore hover-out
+        if (previewing || state.pinned) && !on { return }  // slider preview or pin holds the card open
         collapseTask?.cancel()
         guard on != state.expanded else { return }
         if on {
@@ -101,6 +108,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         previewing = on
         if on { updateVisibility(screen: tracker.current) }
         setExpanded(on)
+    }
+
+    func togglePin() {
+        state.pinned.toggle()
+        if !state.pinned { setExpanded(false) }
+    }
+
+    /// Hotkey opens the card pinned on the screen under the mouse; pressing again closes it.
+    private func toggleFromHotkey() {
+        if state.expanded { state.pinned = false; setExpanded(false); return }
+        move(to: tracker.current)
+        state.pinned = true
+        setExpanded(true)
     }
 
     private func refresh() {

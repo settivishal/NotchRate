@@ -97,3 +97,21 @@ extension HistoryTests {
         #expect(snap.lastUpdated == 1_789_392_000)
     }
 }
+
+@Suite struct AlertTests {
+    @Test func customThresholds() throws {
+        var old = try UsageSnapshot.decoder.decode(UsageSnapshot.self, from: UsageSnapshotTests.sample)
+        old.sessionUsedPct = 60
+        var new = old; new.sessionUsedPct = 71
+        #expect(Notifier.crossings(old: old, new: new, thresholds: [70, 90]) == ["Session usage reached 70%"])
+    }
+
+    @Test func paceWarnsOnlyWhenFullBeforeReset() throws {
+        var s = try UsageSnapshot.decoder.decode(UsageSnapshot.self, from: UsageSnapshotTests.sample)
+        let now = Date(timeIntervalSince1970: 0)
+        s.sessionUsedPct = 50; s.sessionResetsAt = 2 * 3600
+        #expect(Notifier.pace(s, ratePerHour: 50, now: now) != nil)   // full in 1h, resets in 2h
+        #expect(Notifier.pace(s, ratePerHour: 20, now: now) == nil)   // full in 2.5h
+        #expect(Notifier.pace(s, ratePerHour: 0, now: now) == nil)
+    }
+}

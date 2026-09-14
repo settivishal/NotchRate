@@ -10,6 +10,7 @@ final class NotchState {
     var expanded = false
     var page = Page.overview
     var refreshing = false
+    var pinned = false
     init(geometry: NotchGeometry) { self.geometry = geometry }
 }
 
@@ -19,6 +20,7 @@ struct NotchView: View {
     var setExpanded: (Bool) -> Void
     var setPage: (Page) -> Void
     var refresh: () -> Void
+    var togglePin: () -> Void
 
     @AppStorage(Pref.hoverDelay) private var hoverDelay = 0.3
     @AppStorage(Pref.staleHours) private var staleHours = 2.0
@@ -26,6 +28,8 @@ struct NotchView: View {
     @AppStorage(Pref.ringGauges) private var ringGauges = true
     @AppStorage(Pref.pollSeconds) private var pollSeconds = 60.0
     @AppStorage(Pref.cardRadius) private var cardRadius = 28.0
+    @AppStorage(Pref.badgeCountdown) private var badgeCountdown = false
+    @AppStorage(Pref.badgeRing) private var badgeRing = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hoverTask: Task<Void, Never>?
 
@@ -49,7 +53,7 @@ struct NotchView: View {
                         case .week: week(snap, now: ctx.date)
                         }
                     } else {
-                        collapsed(snap, level: level)
+                        collapsed(snap, level: level, now: ctx.date)
                     }
                 }
             }
@@ -77,7 +81,7 @@ struct NotchView: View {
 
     // MARK: collapsed
 
-    private func collapsed(_ snap: UsageSnapshot, level: Level) -> some View {
+    private func collapsed(_ snap: UsageSnapshot, level: Level, now: Date) -> some View {
         let geo = state.geometry
         let stale = level == .stale
         let session = stale ? .stale : Level(pct: snap.sessionUsedPct ?? 0)
@@ -86,18 +90,27 @@ struct NotchView: View {
         return HStack(spacing: 0) {
             Group {
                 if showWeekly {
-                    bucket("5h", snap.sessionUsedPct, level: session).padding(.leading, geo.hasNotch ? 14 : 0)
+                    bucket("5h", snap.sessionUsedPct, resets: snap.sessionResetsAt, level: session, now: now).padding(.leading, geo.hasNotch ? 14 : 0)
                 } else {
-                    Circle().fill(session.color).frame(width: 8, height: 8)
+                    if badgeRing {
+                        ZStack {
+                            Circle().stroke(.white.opacity(0.2), lineWidth: 2)
+                            Circle().trim(from: 0, to: min(snap.sessionUsedPct ?? 0, 100) / 100)
+                                .stroke(session.color, style: StrokeStyle(lineWidth: 2, lineCap: .round)).rotationEffect(.degrees(-90))
+                        }
+                        .frame(width: 10, height: 10)
+                    } else {
+                        Circle().fill(session.color).frame(width: 8, height: 8)
+                    }
                 }
             }
             .frame(width: geo.hasNotch ? geo.wingWidth : 30)
             if geo.hasNotch { Color.clear.frame(width: geo.notchWidth) }
             Group {
                 if showWeekly {
-                    bucket("7d", snap.weeklyUsedPct, level: weekly)
+                    bucket("7d", snap.weeklyUsedPct, resets: snap.weeklyResetsAt, level: weekly, now: now)
                 } else {
-                    pctText(snap.sessionUsedPct, stale: stale)
+                    pctText(snap.sessionUsedPct, resets: snap.sessionResetsAt, stale: stale, now: now)
                 }
             }
             .padding(.trailing, geo.hasNotch ? 14 : 0)
@@ -108,17 +121,19 @@ struct NotchView: View {
     }
 
     /// Caption carries the color so no dot is needed.
-    private func bucket(_ label: String, _ pct: Double?, level: Level) -> some View {
+    private func bucket(_ label: String, _ pct: Double?, resets: Double?, level: Level, now: Date) -> some View {
         HStack(spacing: 3) {
             Text(label).font(.system(size: 9, weight: .bold, design: .rounded)).foregroundStyle(level.color)
-            pctText(pct, stale: level == .stale)
+            pctText(pct, resets: resets, stale: level == .stale, now: now)
         }
         .lineLimit(1)
         .minimumScaleFactor(0.4)
     }
 
-    private func pctText(_ pct: Double?, stale: Bool) -> some View {
-        Text(pct.map { "\(Int($0.rounded()))%" } ?? "—")
+    /// Percent, or time to reset in countdown mode.
+    private func pctText(_ pct: Double?, resets: Double?, stale: Bool, now: Date) -> some View {
+        let text = badgeCountdown ? resets.map { relative($0, now: now) } ?? "—" : pct.map { "\(Int($0.rounded()))%" } ?? "—"
+        return Text(text)
             .font(.system(size: 12, weight: .semibold, design: .rounded))
             .monospacedDigit()
             .lineLimit(1)
@@ -136,6 +151,7 @@ struct NotchView: View {
                 Text(stale ? "offline · \(relative(snap.lastUpdated, now: now)) ago"
                      : now.timeIntervalSince1970 - snap.lastUpdated < 2 * max(30, pollSeconds) ? "live" : "updated \(relative(snap.lastUpdated, now: now)) ago")
                 NavButton(icon: "arrow.clockwise", spinning: state.refreshing, action: refresh)
+                NavButton(icon: state.pinned ? "pin.fill" : "pin", action: togglePin)
             }
             if ringGauges {
                 HStack(spacing: 0) {
@@ -352,8 +368,8 @@ struct NotchView: View {
 
     private func relative(_ epoch: Double, now: Date) -> String {
         let secs = Int(abs(now.timeIntervalSince1970 - epoch))
-        let h = secs / 3600, m = (secs % 3600) / 60
-        return h > 0 ? "\(h)h \(m)m" : "\(m)m"
+        let d = secs / 86400, h = (secs % 86400) / 3600, m = (secs % 3600) / 60
+        return d > 0 ? "\(d)d \(h)h" : h > 0 ? "\(h)h \(m)m" : "\(m)m"
     }
 }
 

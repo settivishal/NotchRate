@@ -6,6 +6,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ### Added
 - Card corner radius setting with live preview while dragging.
+- Badge: countdown-to-reset mode, ring instead of dot.
+- Menu bar text mode.
+- Configurable alert thresholds and a once-per-window pace warning.
+- Global hotkey ⌃⌥N and a pin button to hold the card open.
 
 ### Changed
 - Roomier expanded card padding.

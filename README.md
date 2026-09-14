@@ -43,7 +43,7 @@ Pro and Max limits are shared across Claude Code, claude.ai chat and Cowork, so 
 
 | Page | What it shows |
 |---|---|
-| **Overview** | Session and weekly ring gauges (or bars) with reset countdowns, CLI cost, context window %, extra-usage % when enabled, refresh, link to claude.ai usage |
+| **Overview** | Session and weekly ring gauges (or bars) with reset countdowns, CLI cost, context window %, extra-usage % when enabled, refresh, pin, link to claude.ai usage |
 | **Trends** | 5h and 7d charts, burn rate, "full in ~Xh", usage this window, today's / average daily usage, projected weekly at reset |
 | **This week** | Per-day bars of weekly limit consumed, sessions started, peak session %, limit hits, CLI cost for the week |
 
@@ -115,8 +115,12 @@ Menu bar gauge icon → **Settings…**
 | Setting | Default | Notes |
 |---|---|---|
 | Launch at login | off | `SMAppService`, survives `make clean` because the app lives in `/Applications` |
+| Global hotkey ⌃⌥N | on | Opens the card pinned on the screen under the mouse; again closes |
+| Usage text in menu bar | off | `5h 42% · 7d 13%` instead of the gauge icon |
 | Hide badge | off | Menu bar item only |
 | Show weekly in badge | off | `5h 42%` / `7d 13%`, label colored instead of the dot |
+| Time to reset instead of % | off | Badge shows `2h 13m` |
+| Ring instead of dot | off | 10 pt arc of session usage |
 | Expanded gauges | rings | Rings or bars on the Overview page |
 | Follow mouse to every display | on | Off = notch screen only; plain displays get a pill |
 | Hover delay | 0.3 s | 0–1 s |
@@ -124,6 +128,8 @@ Menu bar gauge icon → **Settings…**
 | Card corner radius | 28 pt | 8–48 pt, previews live while dragging |
 | Poll usage every | 60 s | 30 s – 10 min |
 | Mark offline after | 2 h | 0.5–12 h without an update |
+| Warn at / Alert at | 85 % / 100 % | Notification thresholds per bucket |
+| Pace warning | on | Once per session window when the burn rate reaches 100 % before reset |
 
 ## Privacy
 
