@@ -46,6 +46,7 @@ final class UsagePoller {
     static func merge(_ json: [String: Any], into existing: [String: Any], now: Date = .now) -> [String: Any] {
         var out = existing
         out["tool"] = "claude-code"
+        out["source"] = "api"
         out["last_updated"] = now.timeIntervalSince1970.rounded(.down)
         for (bucket, key) in [("five_hour", "session"), ("seven_day", "weekly")] {
             let b = json[bucket] as? [String: Any]

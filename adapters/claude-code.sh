@@ -19,7 +19,10 @@ done
 if [ -n "$JQ" ]; then
   mkdir -p "$OUT_DIR"
   # Atomic write: watcher only ever sees complete files.
-  printf '%s' "$payload" | "$JQ" -c '{
+  # Claude Code caches rate_limits and lags the real numbers. If the app's API poller
+  # has written this file (source == "api"), keep its session/weekly values.
+  prev='{}'; [ -f "$OUT" ] && prev=$(cat "$OUT" 2>/dev/null || echo '{}')
+  printf '%s' "$payload" | "$JQ" -c --argjson prev "$prev" '{
     tool: "claude-code",
     session_used_pct: .rate_limits.five_hour.used_percentage,
     session_resets_at: .rate_limits.five_hour.resets_at,
@@ -28,7 +31,10 @@ if [ -n "$JQ" ]; then
     cost_usd: .cost.total_cost_usd,
     context_pct: .context_window.used_percentage,
     last_updated: now | floor
-  }' > "$OUT.tmp" 2>/dev/null && mv -f "$OUT.tmp" "$OUT" || rm -f "$OUT.tmp"
+  } as $new
+  | if ($prev.source // "") == "api"
+    then $prev + ($new | del(.session_used_pct, .session_resets_at, .weekly_used_pct, .weekly_resets_at))
+    else $new end' > "$OUT.tmp" 2>/dev/null && mv -f "$OUT.tmp" "$OUT" || rm -f "$OUT.tmp"
 fi
 
 # Never break the terminal statusline, whatever happened above.
