@@ -8,6 +8,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
 - Card corner radius setting with live preview while dragging.
 - Badge: countdown-to-reset mode, ring instead of dot.
 - Menu bar text mode.
+- Per-model weekly buckets (Opus, Sonnet…) on the Overview when the account reports them.
 - Configurable alert thresholds and a once-per-window pace warning.
 - Global hotkey ⌃⌥N and a pin button to hold the card open.
 

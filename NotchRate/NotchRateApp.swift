@@ -47,6 +47,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Notifier.post(old: old, new: new)
             guard let self else { return }
             if let p = store.primary { History.append(p) }
+            state?.tallCard = store.primary?.models?.isEmpty == false
             updateVisibility(screen: tracker?.current)
         }
         poller = UsagePoller(directory: store.directory)
@@ -90,7 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         collapseTask?.cancel()
         guard on != state.expanded else { return }
         if on {
-            panel.setFrame(state.geometry.frame(for: state.geometry.expandedSize(for: state.page)), display: true)
+            panel.setFrame(state.geometry.frame(for: state.geometry.expandedSize(for: state.page, tall: state.tallCard)), display: true)
             state.expanded = true
         } else {
             state.expanded = false
@@ -131,7 +132,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     /// Window takes the larger of old/new page sizes during the switch, then settles.
     private func setPage(_ page: Page) {
-        let old = state.geometry.expandedSize(for: state.page), new = state.geometry.expandedSize(for: page)
+        let old = state.geometry.expandedSize(for: state.page, tall: state.tallCard), new = state.geometry.expandedSize(for: page, tall: state.tallCard)
         panel.setFrame(state.geometry.frame(for: CGSize(width: max(old.width, new.width), height: max(old.height, new.height))), display: true)
         state.page = page
         if new != old {

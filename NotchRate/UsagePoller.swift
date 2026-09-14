@@ -54,6 +54,13 @@ final class UsagePoller {
         }
         let extra = json["extra_usage"] as? [String: Any]
         out["extra_pct"] = extra?["is_enabled"] as? Bool == true ? extra?["utilization"] as? Double : nil
+        // Per-model weekly buckets (seven_day_opus, seven_day_sonnet, …) appear only on accounts that have them.
+        var models: [String: Any] = [:]
+        for (k, v) in json where k.hasPrefix("seven_day_") && k != "seven_day_oauth_apps" {
+            guard let b = v as? [String: Any], let pct = b["utilization"] as? Double else { continue }
+            models[String(k.dropFirst("seven_day_".count))] = ["pct": pct, "resets_at": (b["resets_at"] as? String).flatMap { iso.date(from: $0)?.timeIntervalSince1970 } as Any]
+        }
+        out["models"] = models.isEmpty ? nil : models
         return out
     }
 

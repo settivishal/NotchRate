@@ -11,6 +11,7 @@ final class NotchState {
     var page = Page.overview
     var refreshing = false
     var pinned = false
+    var tallCard = false  // overview shows a per-model row
     init(geometry: NotchGeometry) { self.geometry = geometry }
 }
 
@@ -39,7 +40,7 @@ struct NotchView: View {
 
     var body: some View {
         let geo = state.geometry
-        let size = state.expanded ? geo.expandedSize(for: state.page) : geo.collapsedSize
+        let size = state.expanded ? geo.expandedSize(for: state.page, tall: state.tallCard) : geo.collapsedSize
         TimelineView(.periodic(from: .now, by: 60)) { ctx in
             ZStack(alignment: .top) {
                 NotchShape(topRadius: geo.hasNotch ? 6 : 0, bottomRadius: state.expanded ? cardRadius : 12)
@@ -161,6 +162,18 @@ struct NotchView: View {
             } else {
                 bar("Session", snap.sessionUsedPct, resets: snap.sessionResetsAt, now: now)
                 bar("Weekly", snap.weeklyUsedPct, resets: snap.weeklyResetsAt, now: now)
+            }
+            if let models = snap.models, !models.isEmpty {
+                HStack(spacing: 14) {
+                    ForEach(models.keys.sorted(), id: \.self) { name in
+                        let b = models[name]!
+                        HStack(spacing: 4) {
+                            Text(name.capitalized).font(.caption2).foregroundStyle(.secondary)
+                            Text("\(Int(b.pct.rounded()))%").font(.caption2).monospacedDigit().foregroundStyle(Level(pct: b.pct).color)
+                        }
+                    }
+                    Spacer()
+                }
             }
             Divider().overlay(.white.opacity(0.15))
             HStack {

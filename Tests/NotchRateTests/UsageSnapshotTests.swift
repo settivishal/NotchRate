@@ -115,3 +115,16 @@ extension HistoryTests {
         #expect(Notifier.pace(s, ratePerHour: 0, now: now) == nil)
     }
 }
+
+extension PollerTests {
+    @Test func mergeCollectsModelBuckets() throws {
+        let api: [String: Any] = [
+            "seven_day_opus": ["utilization": 40.0, "resets_at": "2026-09-20T06:00:00.000000+00:00"],
+            "seven_day_sonnet": NSNull(), "seven_day_oauth_apps": ["utilization": 1.0],
+        ]
+        let out = UsagePoller.merge(api, into: [:])
+        let snap = try UsageSnapshot.decoder.decode(UsageSnapshot.self, from: JSONSerialization.data(withJSONObject: out))
+        #expect(snap.models?.keys.sorted() == ["opus"])
+        #expect(snap.models?["opus"]?.pct == 40)
+    }
+}

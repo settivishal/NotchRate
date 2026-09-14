@@ -102,6 +102,7 @@ The app watches `~/.notch-usage/` with a filesystem event source and re-renders 
   "session_used_pct": 42, "session_resets_at": 1757900000,
   "weekly_used_pct": 18,  "weekly_resets_at": 1758200000,
   "cost_usd": 1.23, "context_pct": 37, "extra_pct": null,
+  "models": { "opus": { "pct": 40, "resets_at": 1758200000 } },
   "last_updated": 1757850000
 }
 ```
@@ -166,7 +167,6 @@ Builds with Command Line Tools alone. The Makefile pins the macOS 26.5 SDK becau
 ## Roadmap
 
 - Adapters for Codex CLI, Cursor, Copilot
-- Per-model buckets (Opus / Sonnet) when the account reports them
 - Signed, notarized builds and a Homebrew cask
 
 ## License

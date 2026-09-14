@@ -1,5 +1,10 @@
 import SwiftUI
 
+struct ModelBucket: Codable, Equatable {
+    var pct: Double
+    var resetsAt: Double?
+}
+
 /// Normalized usage shape every adapter writes to ~/.notch-usage/<tool>.json.
 struct UsageSnapshot: Codable, Equatable, Identifiable {
     var tool: String
@@ -10,6 +15,7 @@ struct UsageSnapshot: Codable, Equatable, Identifiable {
     var costUsd: Double?
     var contextPct: Double?
     var extraPct: Double?      // pay-as-you-go extra usage, nil unless enabled
+    var models: [String: ModelBucket]?  // per-model weekly buckets (opus, sonnet…), only when the account reports them
     var lastUpdated: Double
 
     var id: String { tool }
