@@ -51,7 +51,17 @@ Badge colors: green under 60 %, yellow 60–85 %, red above. Greyed out ("offlin
 
 ## Install
 
-**Requirements:** macOS 26+, Apple Silicon, a Claude Pro/Max subscription (rate limits are only reported for those), Claude Code, `jq`, Xcode Command Line Tools.
+**Requirements:** macOS 26+, Apple Silicon, a Claude Pro/Max subscription (rate limits are only reported for those), Claude Code, `jq`.
+
+**Download** — grab `NotchRate-vX.Y.Z.zip` from the [latest release](https://github.com/settivishal/NotchRate/releases/latest), unzip, move `NotchRate.app` to `/Applications`. The build is ad-hoc signed, so on first launch right-click → Open (or `xattr -d com.apple.quarantine /Applications/NotchRate.app`). Then wire up the status line:
+
+```sh
+brew install jq
+curl -fsSL https://raw.githubusercontent.com/settivishal/NotchRate/main/adapters/claude-code.sh -o /tmp/claude-code.sh
+curl -fsSL https://raw.githubusercontent.com/settivishal/NotchRate/main/install.sh | bash -s -- /tmp/claude-code.sh
+```
+
+**Build from source** — needs Xcode Command Line Tools.
 
 ```sh
 brew install jq

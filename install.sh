@@ -1,7 +1,7 @@
 #!/bin/bash
 # Wire the Claude Code adapter into ~/.claude/settings.json (idempotent).
 set -eu
-SRC="$(cd "$(dirname "$0")" && pwd)/adapters/claude-code.sh"
+SRC="${1:-$(cd "$(dirname "$0")" && pwd)/adapters/claude-code.sh}"   # optional: path to adapter (used by the curl install)
 ADAPTER="$HOME/.notch-usage/bin/claude-code.sh"   # copied out of the repo so moving it does not break the statusline
 SETTINGS="$HOME/.claude/settings.json"
 

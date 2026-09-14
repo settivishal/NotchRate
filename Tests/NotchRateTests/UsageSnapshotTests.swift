@@ -77,3 +77,23 @@ extension HistoryTests {
         #expect(History.usedThisWindow(HistoryTests.rows) == 25)  // 5 → 30 after the 100 → 5 drop
     }
 }
+
+@Suite @MainActor struct PollerTests {
+    @Test func mergeKeepsCliFieldsAndDecodes() throws {
+        let api: [String: Any] = [
+            "five_hour": ["utilization": 7.0, "resets_at": "2026-09-14T18:20:00.160841+00:00"],
+            "seven_day": ["utilization": 13.0, "resets_at": "2026-09-20T06:00:00.160865+00:00"],
+            "extra_usage": ["is_enabled": false, "utilization": 50.0],
+        ]
+        let existing: [String: Any] = ["cost_usd": 8.2, "context_pct": 7, "session_used_pct": 99]
+        let out = UsagePoller.merge(api, into: existing, now: Date(timeIntervalSince1970: 1_789_392_000))
+        let snap = try UsageSnapshot.decoder.decode(UsageSnapshot.self, from: JSONSerialization.data(withJSONObject: out))
+        #expect(snap.sessionUsedPct == 7)
+        #expect(snap.weeklyUsedPct == 13)
+        #expect(snap.sessionResetsAt.map { Int($0) } == 1_789_410_000)
+        #expect(snap.costUsd == 8.2)
+        #expect(snap.contextPct == 7)
+        #expect(snap.extraPct == nil)
+        #expect(snap.lastUpdated == 1_789_392_000)
+    }
+}

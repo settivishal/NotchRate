@@ -37,17 +37,24 @@ final class UsagePoller {
               (resp as? HTTPURLResponse)?.statusCode == 200,
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return }
 
-        var out = (try? JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any]) ?? [:]
+        let existing = (try? JSONSerialization.jsonObject(with: Data(contentsOf: file)) as? [String: Any]) ?? [:]
+        let out = Self.merge(json, into: existing)
+        try? (try? JSONSerialization.data(withJSONObject: out))?.write(to: file, options: .atomic)
+    }
+
+    /// Overlay the usage response onto the statusline snapshot; CLI-only fields (cost, context) survive.
+    static func merge(_ json: [String: Any], into existing: [String: Any], now: Date = .now) -> [String: Any] {
+        var out = existing
         out["tool"] = "claude-code"
-        out["last_updated"] = Date.now.timeIntervalSince1970.rounded(.down)
+        out["last_updated"] = now.timeIntervalSince1970.rounded(.down)
         for (bucket, key) in [("five_hour", "session"), ("seven_day", "weekly")] {
             let b = json[bucket] as? [String: Any]
             out["\(key)_used_pct"] = b?["utilization"] as? Double
-            out["\(key)_resets_at"] = (b?["resets_at"] as? String).flatMap { Self.iso.date(from: $0)?.timeIntervalSince1970 }
+            out["\(key)_resets_at"] = (b?["resets_at"] as? String).flatMap { iso.date(from: $0)?.timeIntervalSince1970 }
         }
         let extra = json["extra_usage"] as? [String: Any]
         out["extra_pct"] = extra?["is_enabled"] as? Bool == true ? extra?["utilization"] as? Double : nil
-        try? (try? JSONSerialization.data(withJSONObject: out))?.write(to: file, options: .atomic)
+        return out
     }
 
     // MARK: keychain

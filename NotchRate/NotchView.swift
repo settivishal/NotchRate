@@ -24,6 +24,7 @@ struct NotchView: View {
     @AppStorage(Pref.staleHours) private var staleHours = 2.0
     @AppStorage(Pref.showWeekly) private var showWeekly = false
     @AppStorage(Pref.ringGauges) private var ringGauges = true
+    @AppStorage(Pref.pollSeconds) private var pollSeconds = 60.0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hoverTask: Task<Void, Never>?
 
@@ -131,7 +132,8 @@ struct NotchView: View {
         return VStack(alignment: .leading, spacing: 10) {
             Color.clear.frame(height: state.geometry.topHeight)  // physical notch region
             header("Claude", next: .trends) {
-                Text("\(stale ? "offline" : "updated") · \(relative(snap.lastUpdated, now: now)) ago")
+                Text(stale ? "offline · \(relative(snap.lastUpdated, now: now)) ago"
+                     : now.timeIntervalSince1970 - snap.lastUpdated < 2 * max(30, pollSeconds) ? "live" : "updated \(relative(snap.lastUpdated, now: now)) ago")
                 NavButton(icon: "arrow.clockwise", spinning: state.refreshing, action: refresh)
             }
             if ringGauges {

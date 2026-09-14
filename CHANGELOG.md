@@ -5,6 +5,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
 ## [Unreleased]
 
 ### Added
+- Release workflow: tagged builds attach an ad-hoc signed `NotchRate.app` zip.
 - Trends page: 5h / 7d charts with burn rate, projection and window usage.
 - This week page: per-day bars, sessions, peak, limit hits, CLI cost.
 - Local usage history (`~/.notch-usage/history.jsonl`, 8 days).
@@ -14,6 +15,7 @@ All notable changes to this project are documented here. Format follows [Keep a 
 - Settings: hide badge, show weekly in badge, rings vs bars, poll interval.
 
 ### Changed
+- Overview header shows "live" while polling is fresh instead of "updated 0m ago".
 - Collapsed badge shows session % (was max of session/weekly).
 - Overview redesigned around ring gauges.
 
