@@ -6,15 +6,15 @@ A tiny native macOS app that shows how much of your Claude Code session (5-hour)
 
 ## What you see
 
-**Collapsed** — a colored dot and the highest of your two percentages, sitting in black wings that merge with the notch. On a display without a notch (external monitor), the same badge as a small pill at the top-center of the menu bar.
+**Collapsed** — a colored dot and your session (5h) percentage, sitting in black wings that merge with the notch. On a display without a notch (external monitor), the same badge as a small pill at the top-center of the menu bar.
 
 - Green under 60%, yellow 60–85%, red above 85%
 - Greyed out if Claude Code hasn't reported anything for 2 hours (configurable)
+- Optional: show both buckets as `5h 42%` and `7d 13%`, with the label colored instead of the dot
 
 **Hover** (0.3s) — expands to show:
 
-- Session usage with a bar and reset countdown
-- Weekly usage with a bar and reset countdown
+- Session and weekly usage as ring gauges (or bars) with reset countdowns
 - Session cost in USD
 - Context window usage
 
@@ -63,7 +63,10 @@ If you were using a status line other than `ccstatusline`, set `NOTCH_DOWNSTREAM
 From the menu bar gauge icon → Settings…
 
 - Launch at login
-- Follow mouse to every display, or notch screen only
+- Hide badge (menu bar item only)
+- Show weekly (7d) in the collapsed badge
+- Expanded gauges: rings or bars
+- Follow mouse to every display (pill on plain displays), or notch screen only
 - Hover delay
 - Badge width beside the notch
 - Hours without updates before the badge dims
