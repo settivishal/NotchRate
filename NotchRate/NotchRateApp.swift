@@ -18,12 +18,14 @@ struct NotchRateApp: App {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
+    static var shared: AppDelegate?  // NSApp.delegate is SwiftUI's wrapper, not this object
     private(set) var store: UsageStore!
     private var panel: NotchPanel!
     private var state: NotchState!
     private var tracker: ScreenTracker!
     private var poller: UsagePoller!
     private var collapseTask: Task<Void, Never>?
+    private var previewing = false
 
     var summary: String {
         guard let s = store?.primary else { return "No usage data yet" }
@@ -31,6 +33,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        Self.shared = self
         Pref.register()
         NSApp.setActivationPolicy(.accessory)
         Notifier.requestAuthorization()
@@ -56,7 +59,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             Task { @MainActor in
                 guard let self else { return }
                 self.tracker.setFollowMouse(UserDefaults.standard.bool(forKey: Pref.allDisplays))
-                self.move(to: self.tracker.current)  // wing width may have changed
+                if !self.previewing { self.move(to: self.tracker.current) }  // wing width may have changed
             }
         }
     }
@@ -76,6 +79,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// Window grows before the expand animation and shrinks after the collapse one,
     /// so the transparent hit area never blocks clicks while collapsed.
     private func setExpanded(_ on: Bool) {
+        if previewing && !on { return }  // settings slider is showing the card; ignore hover-out
         collapseTask?.cancel()
         guard on != state.expanded else { return }
         if on {
@@ -90,6 +94,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 panel.setFrame(state.geometry.frame(for: state.geometry.collapsedSize), display: true)
             }
         }
+    }
+
+    /// Settings sliders call this while dragging so the user sees the card change live.
+    func preview(_ on: Bool) {
+        previewing = on
+        if on { updateVisibility(screen: tracker.current) }
+        setExpanded(on)
     }
 
     private func refresh() {

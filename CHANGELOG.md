@@ -4,6 +4,12 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+### Added
+- Card corner radius setting with live preview while dragging.
+
+### Changed
+- Roomier expanded card padding.
+
 ## [0.1.1] — 2026-09-14
 
 ### Added

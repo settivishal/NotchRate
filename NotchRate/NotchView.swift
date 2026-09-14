@@ -25,6 +25,7 @@ struct NotchView: View {
     @AppStorage(Pref.showWeekly) private var showWeekly = false
     @AppStorage(Pref.ringGauges) private var ringGauges = true
     @AppStorage(Pref.pollSeconds) private var pollSeconds = 60.0
+    @AppStorage(Pref.cardRadius) private var cardRadius = 28.0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hoverTask: Task<Void, Never>?
 
@@ -37,7 +38,7 @@ struct NotchView: View {
         let size = state.expanded ? geo.expandedSize(for: state.page) : geo.collapsedSize
         TimelineView(.periodic(from: .now, by: 60)) { ctx in
             ZStack(alignment: .top) {
-                NotchShape(topRadius: geo.hasNotch ? 6 : 0, bottomRadius: state.expanded ? 20 : 12)
+                NotchShape(topRadius: geo.hasNotch ? 6 : 0, bottomRadius: state.expanded ? cardRadius : 12)
                     .fill(.black)
                 if let snap = store.primary {
                     let level = snap.level(now: ctx.date, staleAfter: staleHours * 3600)
@@ -159,8 +160,8 @@ struct NotchView: View {
             }
             .font(.caption).foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 12)
+        .padding(.horizontal, 22)
+        .padding(.bottom, 18)
         .foregroundStyle(.white)
         .opacity(stale ? 0.6 : 1)
         .transition(.opacity)
@@ -204,8 +205,8 @@ struct NotchView: View {
                 Text("collecting data · \(inWindow) samples").font(.caption2).foregroundStyle(.gray)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 12)
+        .padding(.horizontal, 22)
+        .padding(.bottom, 18)
         .foregroundStyle(.white)
         .transition(.opacity)
     }
@@ -294,8 +295,8 @@ struct NotchView: View {
             }
             .font(.caption).foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 16)
-        .padding(.bottom, 12)
+        .padding(.horizontal, 22)
+        .padding(.bottom, 18)
         .foregroundStyle(.white)
         .transition(.opacity)
     }

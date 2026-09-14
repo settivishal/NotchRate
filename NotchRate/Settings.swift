@@ -10,9 +10,10 @@ enum Pref {
     static let hideBadge = "hideBadge"         // Bool, default false: menu bar item only
     static let ringGauges = "ringGauges"       // Bool, default true: expanded view uses rings, else bars
     static let pollSeconds = "pollSeconds"     // Double, default 60: OAuth usage poll interval
+    static let cardRadius = "cardRadius"       // Double points, default 28: expanded card corner radius
 
     static func register() {
-        UserDefaults.standard.register(defaults: [staleHours: 2.0, hoverDelay: 0.3, allDisplays: true, wingWidth: 44.0, showWeekly: false, hideBadge: false, ringGauges: true, pollSeconds: 60.0])
+        UserDefaults.standard.register(defaults: [staleHours: 2.0, hoverDelay: 0.3, allDisplays: true, wingWidth: 44.0, showWeekly: false, hideBadge: false, ringGauges: true, pollSeconds: 60.0, cardRadius: 28.0])
     }
     static var staleAfter: TimeInterval { UserDefaults.standard.double(forKey: staleHours) * 3600 }
 }
@@ -26,6 +27,7 @@ struct SettingsView: View {
     @AppStorage(Pref.hideBadge) private var hideBadge = false
     @AppStorage(Pref.ringGauges) private var ringGauges = true
     @AppStorage(Pref.pollSeconds) private var pollSeconds = 60.0
+    @AppStorage(Pref.cardRadius) private var cardRadius = 28.0
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -49,6 +51,9 @@ struct SettingsView: View {
             Slider(value: $wingWidth, in: 30...120, step: 2) {
                 Text("Badge width beside notch: \(Int(wingWidth))pt")
             }
+            Slider(value: $cardRadius, in: 8...48, step: 2) {
+                Text("Card corner radius: \(Int(cardRadius))pt")
+            } onEditingChanged: { AppDelegate.shared?.preview($0) }
             Slider(value: $pollSeconds, in: 30...600, step: 30) {
                 Text("Poll usage every \(Int(pollSeconds))s")
             }

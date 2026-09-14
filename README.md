@@ -121,6 +121,7 @@ Menu bar gauge icon → **Settings…**
 | Follow mouse to every display | on | Off = notch screen only; plain displays get a pill |
 | Hover delay | 0.3 s | 0–1 s |
 | Badge width beside notch | 44 pt | 30–120 pt |
+| Card corner radius | 28 pt | 8–48 pt, previews live while dragging |
 | Poll usage every | 60 s | 30 s – 10 min |
 | Mark offline after | 2 h | 0.5–12 h without an update |
 
