@@ -12,13 +12,13 @@ A tiny native macOS app that shows how much of your Claude Code session (5-hour)
 - Greyed out ("offline") if no update for 2 hours (configurable)
 - Optional: show both buckets as `5h 42%` and `7d 13%`, with the label colored instead of the dot
 
-**Hover** (0.3s) — expands to show:
+**Hover** (0.3s) — expands into a card with three pages (`›` / `‹` to move between them):
 
-- Session and weekly usage as ring gauges (or bars) with reset countdowns
-- Session cost in USD
-- Context window usage
+- **Overview** — session and weekly usage as ring gauges (or bars) with reset countdowns, CLI cost, context window usage, extra-usage % if enabled, a refresh button and a link to your claude.ai usage page
+- **Trends** — 5h and 7d charts with burn rate, "full in ~Xh", usage this window, today's and average daily usage, projected weekly at reset
+- **This week** — per-day bars of weekly limit consumed, sessions started, peak session %, limit hits, CLI cost for the week
 
-Click the badge to open your usage page on claude.ai. The badge follows your mouse across displays, or can be pinned to the notch screen only. You get a notification when session or weekly usage crosses 85% and 100%.
+History for the charts is collected locally in `~/.notch-usage/history.jsonl` from the moment the app first runs (8 days kept). The badge follows your mouse across displays, or can be pinned to the notch screen only. You get a notification when session or weekly usage crosses 85% and 100%.
 
 ## How it works
 
@@ -89,6 +89,8 @@ Source layout:
 | `adapters/claude-code.sh` | statusLine wrapper, writes normalized JSON |
 | `NotchRate/UsageStore.swift` | watches `~/.notch-usage`, decodes snapshots |
 | `NotchRate/NotchGeometry.swift` | per-screen notch/pill sizing |
+| `NotchRate/UsagePoller.swift` | polls the OAuth usage endpoint, refreshes the token |
+| `NotchRate/History.swift` | usage history log and week/trend stats |
 | `NotchRate/NotchView.swift` | collapsed badge and expanded detail |
 | `NotchRate/ScreenTracker.swift` | which display hosts the badge |
 | `NotchRate/Notifier.swift` | 85% / 100% notifications |
