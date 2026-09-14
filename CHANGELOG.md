@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.2.1] — 2026-09-14
+
 ### Fixed
 - Badge lagged claude.ai: Claude Code reports cached rate limits and the statusline write overwrote fresh API values. API polling is now authoritative for session/weekly.
 
