@@ -22,6 +22,8 @@ Click the badge to open your usage page on claude.ai. The badge follows your mou
 
 ## How it works
 
+While Claude Code is idle the app also polls Anthropic's OAuth usage endpoint every 60s (using Claude Code's own Keychain token), so usage from claude.ai chat and Cowork — which share the same Pro/Max limits — shows up too.
+
 Claude Code runs a [status line](https://code.claude.com/docs/en/statusline) script after every turn and pipes it JSON including `rate_limits`, `cost` and `context_window`. NotchRate installs a small wrapper as that script:
 
 ```

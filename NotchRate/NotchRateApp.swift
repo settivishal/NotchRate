@@ -22,6 +22,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panel: NotchPanel!
     private var state: NotchState!
     private var tracker: ScreenTracker!
+    private var poller: UsagePoller!
     private var collapseTask: Task<Void, Never>?
 
     var summary: String {
@@ -40,6 +41,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             updateVisibility(screen: tracker?.current)
         }
+        poller = UsagePoller(directory: store.directory)
 
         state = NotchState(geometry: NotchGeometry(screen: NSScreen.main ?? NSScreen.screens[0]))
         panel = NotchPanel()
