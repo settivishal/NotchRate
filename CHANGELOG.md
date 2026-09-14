@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-09-14
+
 ### Added
 - Release workflow: tagged builds attach an ad-hoc signed `NotchRate.app` zip.
 - Trends page: 5h / 7d charts with burn rate, projection and window usage.
