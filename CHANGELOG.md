@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.2.0] — 2026-09-14
+
 ### Added
 - Card corner radius setting with live preview while dragging.
 - Badge: countdown-to-reset mode, ring instead of dot.
