@@ -1,16 +1,18 @@
 #!/bin/bash
 # Wire the Claude Code adapter into ~/.claude/settings.json (idempotent).
 set -eu
-ADAPTER="$(cd "$(dirname "$0")" && pwd)/adapters/claude-code.sh"
+SRC="$(cd "$(dirname "$0")" && pwd)/adapters/claude-code.sh"
+ADAPTER="$HOME/.notch-usage/bin/claude-code.sh"   # copied out of the repo so moving it does not break the statusline
 SETTINGS="$HOME/.claude/settings.json"
 
 command -v jq >/dev/null || { echo "jq missing: brew install jq"; exit 1; }
-mkdir -p "$HOME/.notch-usage"
+mkdir -p "$HOME/.notch-usage/bin"
+cp "$SRC" "$ADAPTER" && chmod +x "$ADAPTER"
 
 cur=$(jq -r '.statusLine.command // ""' "$SETTINGS")
-if [ "$cur" = "$ADAPTER" ]; then echo "already installed"; exit 0; fi
+if [ "$cur" = "$ADAPTER" ]; then echo "adapter updated: $ADAPTER"; exit 0; fi
 # Keep whatever was there as the downstream statusline (default ccstatusline).
-[ -n "$cur" ] && [ "$cur" != "ccstatusline" ] && echo "note: previous statusLine was '$cur'; adapter chains to ccstatusline. Set NOTCH_DOWNSTREAM in adapters/claude-code.sh to change."
+[ -n "$cur" ] && [ "$cur" != "ccstatusline" ] && [ "${cur##*/}" != "claude-code.sh" ] && echo "note: previous statusLine was '$cur'; adapter chains to ccstatusline (NOTCH_DOWNSTREAM to change)."
 
 cp "$SETTINGS" "$SETTINGS.bak"
 jq --arg cmd "$ADAPTER" '.statusLine = ((.statusLine // {}) + {type:"command", command:$cmd})' "$SETTINGS" > "$SETTINGS.tmp" && mv "$SETTINGS.tmp" "$SETTINGS"

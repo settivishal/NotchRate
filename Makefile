@@ -5,7 +5,7 @@ FW    = $(CLT)/Library/Developer/Frameworks
 APP   = build/NotchRate.app
 SWIFT = SDKROOT=$(SDK) swift
 
-.PHONY: build app run test clean
+.PHONY: build app run install test clean
 build:
 	$(SWIFT) build --build-system native -c release
 
@@ -18,6 +18,13 @@ app: build
 run: app
 	pkill -x NotchRate || true
 	open $(APP)
+
+# Stable path so "Launch at login" (SMAppService) survives make clean.
+install: app
+	pkill -x NotchRate || true
+	rm -rf /Applications/NotchRate.app && cp -R $(APP) /Applications/
+	./install.sh
+	open /Applications/NotchRate.app
 
 test:
 	$(SWIFT) test --build-system native -Xswiftc -F$(FW) -Xlinker -F$(FW) -Xlinker -rpath -Xlinker $(FW)
