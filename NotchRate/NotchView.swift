@@ -122,7 +122,7 @@ struct NotchView: View {
             HStack {
                 Text("Claude").font(.headline)
                 Spacer()
-                Text("\(stale ? "stale" : "updated") · \(relative(snap.lastUpdated, now: now)) ago")
+                Text("\(stale ? "offline" : "updated") · \(relative(snap.lastUpdated, now: now)) ago")
                     .font(.caption).foregroundStyle(.gray)
             }
             if ringGauges {
@@ -140,6 +140,10 @@ struct NotchView: View {
                 Spacer()
                 Text("\(Int((snap.contextPct ?? 0).rounded()))% context")
                 Spacer()
+                if let extra = snap.extraPct {
+                    Text("\(Int(extra.rounded()))% extra")
+                    Spacer()
+                }
                 Label("usage", systemImage: "arrow.up.right").labelStyle(.titleAndIcon)
             }
             .font(.caption).foregroundStyle(.secondary)

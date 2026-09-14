@@ -27,7 +27,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     var summary: String {
         guard let s = store?.primary else { return "No usage data yet" }
-        return "Session \(Int((s.sessionUsedPct ?? 0).rounded()))% · Weekly \(Int((s.weeklyUsedPct ?? 0).rounded()))%"
+        return "5h \(Int((s.sessionUsedPct ?? 0).rounded()))% · 7d \(Int((s.weeklyUsedPct ?? 0).rounded()))%"
     }
 
     func applicationDidFinishLaunching(_ notification: Notification) {

@@ -9,7 +9,7 @@ A tiny native macOS app that shows how much of your Claude Code session (5-hour)
 **Collapsed** — a colored dot and your session (5h) percentage, sitting in black wings that merge with the notch. On a display without a notch (external monitor), the same badge as a small pill at the top-center of the menu bar.
 
 - Green under 60%, yellow 60–85%, red above 85%
-- Greyed out if Claude Code hasn't reported anything for 2 hours (configurable)
+- Greyed out ("offline") if no update for 2 hours (configurable)
 - Optional: show both buckets as `5h 42%` and `7d 13%`, with the label colored instead of the dot
 
 **Hover** (0.3s) — expands to show:
@@ -69,7 +69,8 @@ From the menu bar gauge icon → Settings…
 - Follow mouse to every display (pill on plain displays), or notch screen only
 - Hover delay
 - Badge width beside the notch
-- Hours without updates before the badge dims
+- Poll interval for account-wide usage (30s–10min)
+- Hours without updates before the badge goes offline
 
 ## Development
 

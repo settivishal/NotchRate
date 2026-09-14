@@ -9,6 +9,7 @@ struct UsageSnapshot: Codable, Equatable, Identifiable {
     var weeklyResetsAt: Double?
     var costUsd: Double?
     var contextPct: Double?
+    var extraPct: Double?      // pay-as-you-go extra usage, nil unless enabled
     var lastUpdated: Double
 
     var id: String { tool }

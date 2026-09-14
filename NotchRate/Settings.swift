@@ -9,9 +9,10 @@ enum Pref {
     static let showWeekly = "showWeekly"       // Bool, default false: collapsed badge shows 5h and 7d
     static let hideBadge = "hideBadge"         // Bool, default false: menu bar item only
     static let ringGauges = "ringGauges"       // Bool, default true: expanded view uses rings, else bars
+    static let pollSeconds = "pollSeconds"     // Double, default 60: OAuth usage poll interval
 
     static func register() {
-        UserDefaults.standard.register(defaults: [staleHours: 2.0, hoverDelay: 0.3, allDisplays: true, wingWidth: 44.0, showWeekly: false, hideBadge: false, ringGauges: true])
+        UserDefaults.standard.register(defaults: [staleHours: 2.0, hoverDelay: 0.3, allDisplays: true, wingWidth: 44.0, showWeekly: false, hideBadge: false, ringGauges: true, pollSeconds: 60.0])
     }
     static var staleAfter: TimeInterval { UserDefaults.standard.double(forKey: staleHours) * 3600 }
 }
@@ -24,6 +25,7 @@ struct SettingsView: View {
     @AppStorage(Pref.showWeekly) private var showWeekly = false
     @AppStorage(Pref.hideBadge) private var hideBadge = false
     @AppStorage(Pref.ringGauges) private var ringGauges = true
+    @AppStorage(Pref.pollSeconds) private var pollSeconds = 60.0
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -47,8 +49,11 @@ struct SettingsView: View {
             Slider(value: $wingWidth, in: 30...120, step: 2) {
                 Text("Badge width beside notch: \(Int(wingWidth))pt")
             }
+            Slider(value: $pollSeconds, in: 30...600, step: 30) {
+                Text("Poll usage every \(Int(pollSeconds))s")
+            }
             Slider(value: $staleHours, in: 0.5...12, step: 0.5) {
-                Text("Dim after \(staleHours, format: .number.precision(.fractionLength(1)))h without updates")
+                Text("Mark offline after \(staleHours, format: .number.precision(.fractionLength(1)))h without updates")
             }
         }
         .formStyle(.grouped)
