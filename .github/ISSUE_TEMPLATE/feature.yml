@@ -1,0 +1,11 @@
+name: Feature request
+description: Something NotchRate should do
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes: { label: What and why }
+    validations: { required: true }
+  - type: textarea
+    id: how
+    attributes: { label: How it could look, description: Sketch, mockup or description. }

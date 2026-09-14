@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="160" viewBox="0 0 720 160">
+  <rect width="720" height="160" rx="24" fill="#0b0b0c"/>
+  <!-- notch with wings -->
+  <path d="M190 0 H530 Q530 0 530 8 V44 Q530 60 514 60 H206 Q190 60 190 44 V8 Q190 0 190 0 Z" fill="#000"/>
+  <circle cx="214" cy="30" r="7" fill="#34c759"/>
+  <text x="506" y="36" font-family="-apple-system, SF Pro Rounded, Helvetica, Arial" font-size="18" font-weight="600" fill="#fff" text-anchor="end">42%</text>
+  <text x="360" y="118" font-family="-apple-system, SF Pro Display, Helvetica, Arial" font-size="40" font-weight="700" fill="#fff" text-anchor="middle">NotchRate</text>
+  <text x="360" y="146" font-family="-apple-system, SF Pro Text, Helvetica, Arial" font-size="15" fill="#9a9a9f" text-anchor="middle">Claude usage limits, in the notch</text>
+</svg>

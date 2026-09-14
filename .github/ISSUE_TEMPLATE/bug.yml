@@ -1,0 +1,24 @@
+name: Bug report
+description: Something is wrong
+labels: [bug]
+body:
+  - type: input
+    id: macos
+    attributes: { label: macOS version, placeholder: "26.1" }
+    validations: { required: true }
+  - type: dropdown
+    id: display
+    attributes:
+      label: Display
+      options: [Built-in with notch, External display (pill), Both]
+    validations: { required: true }
+  - type: textarea
+    id: what
+    attributes: { label: What happened, description: Steps, expected vs actual. }
+    validations: { required: true }
+  - type: textarea
+    id: snapshot
+    attributes:
+      label: ~/.notch-usage/claude-code.json
+      description: Paste with anything private removed.
+      render: json

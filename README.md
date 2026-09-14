@@ -1,106 +1,157 @@
-# NotchRate
+<p align="center">
+  <img src="docs/logo.svg" alt="NotchRate" width="600">
+</p>
 
-Your Claude Code rate-limit usage, in the MacBook notch.
+<p align="center">
+  <a href="https://github.com/settivishal/NotchRate/releases"><img alt="Release" src="https://img.shields.io/github/v/release/settivishal/NotchRate?include_prereleases&color=blue"></a>
+  <a href="https://github.com/settivishal/NotchRate/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/settivishal/NotchRate/actions/workflows/ci.yml/badge.svg"></a>
+  <img alt="macOS 26+" src="https://img.shields.io/badge/macOS-26%2B-black?logo=apple">
+  <img alt="Swift 6" src="https://img.shields.io/badge/Swift-6-F05138?logo=swift&logoColor=white">
+  <a href="LICENSE"><img alt="MIT" src="https://img.shields.io/badge/license-MIT-green"></a>
+  <a href="https://github.com/settivishal/NotchRate/stargazers"><img alt="Stars" src="https://img.shields.io/github/stars/settivishal/NotchRate?style=flat&color=yellow"></a>
+</p>
 
-A tiny native macOS app that shows how much of your Claude Code session (5-hour) and weekly (7-day) limits you've used, right beside the notch. Glance at it; hover it for detail. Near-zero idle CPU.
+<p align="center">
+  <a href="#see-it">See it</a> ·
+  <a href="#install">Install</a> ·
+  <a href="#how-it-works">How it works</a> ·
+  <a href="#settings">Settings</a> ·
+  <a href="#privacy">Privacy</a> ·
+  <a href="#development">Development</a> ·
+  <a href="CONTRIBUTING.md">Contributing</a> ·
+  <a href="LICENSE">License</a>
+</p>
 
-## What you see
+---
 
-**Collapsed** — a colored dot and your session (5h) percentage, sitting in black wings that merge with the notch. On a display without a notch (external monitor), the same badge as a small pill at the top-center of the menu bar.
+**NotchRate** is a native macOS app that shows how much of your Claude **session (5h)** and **weekly (7d)** limits you have used, right beside the MacBook notch. Glance at it; hover for detail. Near-zero idle CPU, no Electron.
 
-- Green under 60%, yellow 60–85%, red above 85%
-- Greyed out ("offline") if no update for 2 hours (configurable)
-- Optional: show both buckets as `5h 42%` and `7d 13%`, with the label colored instead of the dot
+Pro and Max limits are shared across Claude Code, claude.ai chat and Cowork, so the badge reflects all of them — not just the terminal.
 
-**Hover** (0.3s) — expands into a card with three pages (`›` / `‹` to move between them):
+## See it
 
-- **Overview** — session and weekly usage as ring gauges (or bars) with reset countdowns, CLI cost, context window usage, extra-usage % if enabled, a refresh button and a link to your claude.ai usage page
-- **Trends** — 5h and 7d charts with burn rate, "full in ~Xh", usage this window, today's and average daily usage, projected weekly at reset
-- **This week** — per-day bars of weekly limit consumed, sessions started, peak session %, limit hits, CLI cost for the week
+<p align="center">
+  <img src="docs/screenshot-badge.png" alt="Collapsed badge beside the notch" width="480"><br>
+  <sub>Collapsed: dot + session %, merged with the notch. On external displays, a pill at the top of the menu bar.</sub>
+</p>
 
-History for the charts is collected locally in `~/.notch-usage/history.jsonl` from the moment the app first runs (8 days kept). The badge follows your mouse across displays, or can be pinned to the notch screen only. You get a notification when session or weekly usage crosses 85% and 100%.
+<p align="center">
+  <img src="docs/screenshot-overview.png" alt="Overview page" width="300">
+  <img src="docs/screenshot-trends.png" alt="Trends page" width="300">
+  <img src="docs/screenshot-week.png" alt="This week page" width="300">
+</p>
+
+| Page | What it shows |
+|---|---|
+| **Overview** | Session and weekly ring gauges (or bars) with reset countdowns, CLI cost, context window %, extra-usage % when enabled, refresh, link to claude.ai usage |
+| **Trends** | 5h and 7d charts, burn rate, "full in ~Xh", usage this window, today's / average daily usage, projected weekly at reset |
+| **This week** | Per-day bars of weekly limit consumed, sessions started, peak session %, limit hits, CLI cost for the week |
+
+Badge colors: green under 60 %, yellow 60–85 %, red above. Greyed out ("offline") when no update arrives for 2 h. Notifications fire when session or weekly usage crosses 85 % and 100 %.
+
+## Install
+
+**Requirements:** macOS 26+, Apple Silicon, a Claude Pro/Max subscription (rate limits are only reported for those), Claude Code, `jq`, Xcode Command Line Tools.
+
+```sh
+brew install jq
+git clone https://github.com/settivishal/NotchRate.git
+cd NotchRate
+make install
+```
+
+`make install` builds `/Applications/NotchRate.app`, copies the status-line adapter to `~/.notch-usage/bin/`, and points `statusLine.command` in `~/.claude/settings.json` at it (backup in `settings.json.bak`). The badge appears within a minute; restart Claude Code to get CLI cost and context data.
+
+Using a status line other than `ccstatusline`? Set `NOTCH_DOWNSTREAM` at the top of `~/.notch-usage/bin/claude-code.sh`.
+
+**Uninstall:** quit the app, delete `/Applications/NotchRate.app` and `~/.notch-usage/`, restore `~/.claude/settings.json.bak`.
 
 ## How it works
 
-While Claude Code is idle the app also polls Anthropic's OAuth usage endpoint every 60s (using Claude Code's own Keychain token), so usage from claude.ai chat and Cowork — which share the same Pro/Max limits — shows up too.
-
-Claude Code runs a [status line](https://code.claude.com/docs/en/statusline) script after every turn and pipes it JSON including `rate_limits`, `cost` and `context_window`. NotchRate installs a small wrapper as that script:
-
+```mermaid
+flowchart LR
+    CC[Claude Code<br/>statusLine hook] -->|JSON on stdin| A[adapters/claude-code.sh]
+    A -->|atomic write| F[(~/.notch-usage/<br/>claude-code.json)]
+    A -->|passthrough| S[ccstatusline]
+    API[api.anthropic.com<br/>/api/oauth/usage] -->|every 60 s| P[UsagePoller]
+    P -->|merge session/weekly| F
+    F -->|DispatchSource, no polling| App[NotchRate.app]
+    App --> H[(history.jsonl)]
 ```
-adapters/claude-code.sh
-  stdin JSON ──▶ ~/.notch-usage/claude-code.json   (normalized, atomic write)
-             └─▶ ccstatusline                      (your existing status line, unchanged)
-```
 
-The app watches `~/.notch-usage/` with a filesystem event source (no polling) and re-renders when the file changes. Adapters for other tools would write their own `<tool>.json` in the same normalized shape; the app never reads tool-specific JSON.
+Two data sources feed one normalized file:
+
+1. **Status line** — Claude Code runs a script after every turn with `rate_limits`, `cost` and `context_window`. The adapter normalizes it and chains to your existing status line, so the terminal is unchanged.
+2. **OAuth usage endpoint** — while the CLI is idle, the app polls Anthropic's usage endpoint with Claude Code's own token, so chat and Cowork usage show up too. The token is refreshed when it expires and written back to the Keychain the same way Claude Code does.
+
+The app watches `~/.notch-usage/` with a filesystem event source and re-renders on change. Any tool can join by writing its own `<tool>.json` in this shape:
 
 ```json
 {
   "tool": "claude-code",
   "session_used_pct": 42, "session_resets_at": 1757900000,
   "weekly_used_pct": 18,  "weekly_resets_at": 1758200000,
-  "cost_usd": 1.23, "context_pct": 37,
+  "cost_usd": 1.23, "context_pct": 37, "extra_pct": null,
   "last_updated": 1757850000
 }
 ```
 
-## Install
-
-Requirements: macOS 26+, Apple Silicon, Claude Code with a Pro/Max subscription (rate limits are only reported for those), `jq` (`brew install jq`), Xcode Command Line Tools.
-
-```sh
-git clone https://github.com/settivishal/NotchRate.git
-cd NotchRate
-make install
-```
-
-This builds the app into `/Applications/NotchRate.app`, copies the adapter to `~/.notch-usage/bin/`, and points `~/.claude/settings.json`'s `statusLine` at it (a backup is saved as `settings.json.bak`). Restart Claude Code; the badge appears after the first response.
-
-If you were using a status line other than `ccstatusline`, set `NOTCH_DOWNSTREAM` at the top of the adapter to chain to it instead.
+Every change is appended to `~/.notch-usage/history.jsonl` (8 days kept) to drive the Trends and Week pages.
 
 ## Settings
 
-From the menu bar gauge icon → Settings…
+Menu bar gauge icon → **Settings…**
 
-- Launch at login
-- Hide badge (menu bar item only)
-- Show weekly (7d) in the collapsed badge
-- Expanded gauges: rings or bars
-- Follow mouse to every display (pill on plain displays), or notch screen only
-- Hover delay
-- Badge width beside the notch
-- Poll interval for account-wide usage (30s–10min)
-- Hours without updates before the badge goes offline
+| Setting | Default | Notes |
+|---|---|---|
+| Launch at login | off | `SMAppService`, survives `make clean` because the app lives in `/Applications` |
+| Hide badge | off | Menu bar item only |
+| Show weekly in badge | off | `5h 42%` / `7d 13%`, label colored instead of the dot |
+| Expanded gauges | rings | Rings or bars on the Overview page |
+| Follow mouse to every display | on | Off = notch screen only; plain displays get a pill |
+| Hover delay | 0.3 s | 0–1 s |
+| Badge width beside notch | 44 pt | 30–120 pt |
+| Poll usage every | 60 s | 30 s – 10 min |
+| Mark offline after | 2 h | 0.5–12 h without an update |
+
+## Privacy
+
+- **Network:** one `GET` to `api.anthropic.com/api/oauth/usage` per poll interval, plus a token refresh `POST` to `console.anthropic.com` when the token has expired. Nothing else. No telemetry, no third-party servers.
+- **Keychain:** reads the `Claude Code-credentials` item via the `security` CLI (already on that item's ACL, so no prompt). Writes back only after a token refresh, preserving every other field.
+- **Disk:** `~/.notch-usage/` holds the normalized snapshot and the history log. Both are plain JSON you can delete at any time.
+- **Endpoint stability:** the OAuth usage endpoint is undocumented; if it changes, the badge falls back to status-line data and goes "offline" between CLI turns.
+
+See [SECURITY.md](SECURITY.md) for reporting.
 
 ## Development
 
 ```sh
-make run     # build to build/NotchRate.app and launch
-make test    # swift-testing unit tests
+make run      # build to build/NotchRate.app and launch
+make test     # swift-testing unit tests
 bash adapters/test.sh   # adapter self-check
 ```
 
-Builds with Command Line Tools alone (no Xcode). The Makefile pins the macOS 26.5 SDK because the 27 SDK's SwiftUI macros need a plugin that only ships with Xcode. Xcode can open `Package.swift` directly if you have it.
-
-Source layout:
+Builds with Command Line Tools alone. The Makefile pins the macOS 26.5 SDK because the 27 SDK's SwiftUI macros need a plugin that only ships with Xcode; with Xcode installed, `swift build` and `Package.swift` work directly.
 
 | File | Role |
 |---|---|
 | `adapters/claude-code.sh` | statusLine wrapper, writes normalized JSON |
+| `install.sh` | copies adapter, patches `~/.claude/settings.json` |
 | `NotchRate/UsageStore.swift` | watches `~/.notch-usage`, decodes snapshots |
-| `NotchRate/NotchGeometry.swift` | per-screen notch/pill sizing |
 | `NotchRate/UsagePoller.swift` | polls the OAuth usage endpoint, refreshes the token |
-| `NotchRate/History.swift` | usage history log and week/trend stats |
-| `NotchRate/NotchView.swift` | collapsed badge and expanded detail |
+| `NotchRate/History.swift` | history log, week and trend stats |
+| `NotchRate/NotchGeometry.swift` | per-screen notch/pill sizing |
+| `NotchRate/NotchView.swift` | collapsed badge, Overview / Trends / Week pages |
 | `NotchRate/ScreenTracker.swift` | which display hosts the badge |
-| `NotchRate/Notifier.swift` | 85% / 100% notifications |
+| `NotchRate/Notifier.swift` | 85 % / 100 % notifications |
+| `NotchRate/Settings.swift` | preferences and Settings window |
 
-## Not yet
+## Roadmap
 
-- Codex CLI, Cursor, Copilot adapters
-- Usage history or graphs
-- Signed/notarized builds
+- Adapters for Codex CLI, Cursor, Copilot
+- Per-model buckets (Opus / Sonnet) when the account reports them
+- Signed, notarized builds and a Homebrew cask
 
 ## License
 
-MIT
+[MIT](LICENSE). The notch geometry is inspired by [DynamicNotchKit](https://github.com/MrKai77/DynamicNotchKit) (MIT); [boringNotch](https://github.com/TheBoredTeam/boring.notch) was used as a read-only reference.
