@@ -22,7 +22,7 @@ final class UsagePoller {
 
     deinit { task?.cancel() }
 
-    private func poll() async {
+    func poll() async {
         guard var creds = Self.readCreds() else { return }
         // Token lives a few hours; Claude Code refreshes it only when run, so refresh here when past expiry.
         if (creds["expiresAt"] as? Double ?? 0) / 1000 < Date.now.timeIntervalSince1970 + 60 {

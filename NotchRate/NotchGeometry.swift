@@ -28,8 +28,13 @@ struct NotchGeometry {
         CGSize(width: hasNotch ? notchWidth + 2 * wingWidth : Self.pillWidth, height: topHeight)
     }
 
-    var expandedSize: CGSize {
-        CGSize(width: max(Self.expandedSize.width, collapsedSize.width), height: topHeight + Self.expandedSize.height)
+    func expandedSize(for page: Page = .overview) -> CGSize {
+        let card = switch page {
+        case .overview: Self.expandedSize
+        case .trends: CGSize(width: 380, height: 270)
+        case .week: CGSize(width: 380, height: 230)
+        }
+        return CGSize(width: max(card.width, collapsedSize.width), height: topHeight + card.height)
     }
 
     /// Top-center frame for a window of `size` on this screen.

@@ -39,13 +39,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         store.onUpdate = { [weak self] old, new in
             Notifier.post(old: old, new: new)
             guard let self else { return }
+            if let p = store.primary { History.append(p) }
             updateVisibility(screen: tracker?.current)
         }
         poller = UsagePoller(directory: store.directory)
 
         state = NotchState(geometry: NotchGeometry(screen: NSScreen.main ?? NSScreen.screens[0]))
         panel = NotchPanel()
-        panel.contentView = NSHostingView(rootView: NotchView(store: store, state: state) { [weak self] in self?.setExpanded($0) })
+        panel.contentView = NSHostingView(rootView: NotchView(store: store, state: state,
+                                                              setExpanded: { [weak self] in self?.setExpanded($0) },
+                                                              setPage: { [weak self] in self?.setPage($0) },
+                                                              refresh: { [weak self] in self?.refresh() }))
 
         tracker = ScreenTracker(followMouse: UserDefaults.standard.bool(forKey: Pref.allDisplays)) { [weak self] in self?.move(to: $0) }
         NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
@@ -75,14 +79,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         collapseTask?.cancel()
         guard on != state.expanded else { return }
         if on {
-            panel.setFrame(state.geometry.frame(for: state.geometry.expandedSize), display: true)
+            panel.setFrame(state.geometry.frame(for: state.geometry.expandedSize(for: state.page)), display: true)
             state.expanded = true
         } else {
             state.expanded = false
+            state.page = .overview
             collapseTask = Task {
                 try? await Task.sleep(for: .milliseconds(450))
                 guard !Task.isCancelled, !state.expanded else { return }
                 panel.setFrame(state.geometry.frame(for: state.geometry.collapsedSize), display: true)
+            }
+        }
+    }
+
+    private func refresh() {
+        guard !state.refreshing else { return }
+        state.refreshing = true
+        Task { await poller.poll(); state.refreshing = false }
+    }
+
+    /// Window takes the larger of old/new page sizes during the switch, then settles.
+    private func setPage(_ page: Page) {
+        let old = state.geometry.expandedSize(for: state.page), new = state.geometry.expandedSize(for: page)
+        panel.setFrame(state.geometry.frame(for: CGSize(width: max(old.width, new.width), height: max(old.height, new.height))), display: true)
+        state.page = page
+        if new != old {
+            collapseTask?.cancel()
+            collapseTask = Task {
+                try? await Task.sleep(for: .milliseconds(450))
+                guard !Task.isCancelled, state.expanded, state.page == page else { return }
+                panel.setFrame(state.geometry.frame(for: new), display: true)
             }
         }
     }

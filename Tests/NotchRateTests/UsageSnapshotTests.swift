@@ -47,3 +47,33 @@ import Testing
         #expect(Notifier.crossings(old: new, new: new).isEmpty)
     }
 }
+
+@Suite @MainActor struct HistoryTests {
+    // day 0: weekly 0→4; session 20→90→100, resets to 5; cost 1→3, new session 0→2. day 1: weekly 4→6.
+    static let rows: [Sample] = [
+        Sample(ts: 0, s: 20, w: 0, c: 1), Sample(ts: 3600, s: 90, w: 2, c: 3), Sample(ts: 7200, s: 100, w: 4, c: 0),
+        Sample(ts: 10800, s: 5, w: 4, c: 2), Sample(ts: 86400 + 3600, s: 30, w: 6, c: 2),
+    ]
+
+    @Test func weekStats() {
+        var cal = Calendar(identifier: .gregorian); cal.timeZone = .gmt
+        let now = Date(timeIntervalSince1970: 86400 + 7200)
+        let st = WeekStats(Self.rows, weeklyResetsAt: 6 * 86400, now: now, calendar: cal)
+        #expect(st.daily.map(\.pct).suffix(2) == [4, 2])
+        #expect(st.sessions == 1)
+        #expect(st.hitLimit == 1)
+        #expect(st.cliCost == 4)
+        #expect(st.peakSession == 100)
+    }
+
+    @Test func rateIgnoresResets() {
+        let now = Date(timeIntervalSince1970: 10800)
+        #expect(abs(History.rate(Self.rows, \.s, hours: 3, now: now) - 80 / 3) < 0.01, "\(History.rate(Self.rows, \.s, hours: 3, now: now))")
+    }
+}
+
+extension HistoryTests {
+    @Test func usedThisWindowStopsAtReset() {
+        #expect(History.usedThisWindow(HistoryTests.rows) == 25)  // 5 → 30 after the 100 → 5 drop
+    }
+}
