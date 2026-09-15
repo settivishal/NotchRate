@@ -45,6 +45,7 @@ final class UsageStore {
     }
 
     func reload() {
+        Statusline.ingest(directory: directory)
         let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)) ?? []
         let new = files
             .filter { $0.pathExtension == "json" }

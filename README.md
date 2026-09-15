@@ -51,26 +51,19 @@ Badge colors: green under 60 %, yellow 60–85 %, red above. Greyed out ("offlin
 
 ## Install
 
-**Requirements:** macOS 26+, Apple Silicon, a Claude Pro/Max subscription (rate limits are only reported for those), Claude Code, `jq`.
+**Requirements:** macOS 26+, Apple Silicon, a Claude Pro/Max subscription (rate limits are only reported for those), Claude Code.
 
-**Download** — grab `NotchRate-vX.Y.Z.zip` from the [latest release](https://github.com/settivishal/NotchRate/releases/latest), unzip, move `NotchRate.app` to `/Applications`. The build is ad-hoc signed, so on first launch right-click → Open (or `xattr -d com.apple.quarantine /Applications/NotchRate.app`). Then wire up the status line:
+**Download** — grab `NotchRate-vX.Y.Z.zip` from the [latest release](https://github.com/settivishal/NotchRate/releases/latest), unzip, move `NotchRate.app` to `/Applications`. The build is ad-hoc signed, so on first launch right-click → Open (or `xattr -d com.apple.quarantine /Applications/NotchRate.app`). Session/weekly % show up within a minute. For CLI cost and context data, click the menu bar icon → **Connect Claude Code status line…**, then restart Claude Code.
 
-```sh
-brew install jq
-curl -fsSL https://raw.githubusercontent.com/settivishal/NotchRate/main/adapters/claude-code.sh -o /tmp/claude-code.sh
-curl -fsSL https://raw.githubusercontent.com/settivishal/NotchRate/main/install.sh | bash -s -- /tmp/claude-code.sh
-```
-
-**Build from source** — needs Xcode Command Line Tools.
+**Build from source** — needs Xcode.
 
 ```sh
-brew install jq
 git clone https://github.com/settivishal/NotchRate.git
 cd NotchRate
 make install
 ```
 
-`make install` builds `/Applications/NotchRate.app`, copies the status-line adapter to `~/.notch-usage/bin/`, and points `statusLine.command` in `~/.claude/settings.json` at it (backup in `settings.json.bak`). The badge appears within a minute; restart Claude Code to get CLI cost and context data.
+**Connect** copies the bundled status-line adapter to `~/.notch-usage/bin/` and points `statusLine.command` in `~/.claude/settings.json` at it (backup in `settings.json.bak`). The app refreshes the adapter on launch when a release changes it.
 
 Using a status line other than `ccstatusline`? Set `NOTCH_DOWNSTREAM` at the top of `~/.notch-usage/bin/claude-code.sh`.
 
@@ -81,7 +74,8 @@ Using a status line other than `ccstatusline`? Set `NOTCH_DOWNSTREAM` at the top
 ```mermaid
 flowchart LR
     CC[Claude Code<br/>statusLine hook] -->|JSON on stdin| A[adapters/claude-code.sh]
-    A -->|atomic write| F[(~/.notch-usage/<br/>claude-code.json)]
+    A -->|atomic write| R[(claude-code.raw)]
+    R -->|Statusline.ingest| F[(~/.notch-usage/<br/>claude-code.json)]
     A -->|passthrough| S[ccstatusline]
     API[api.anthropic.com<br/>/api/oauth/usage] -->|every 60 s| P[UsagePoller]
     P -->|merge session/weekly| F
@@ -149,12 +143,12 @@ make test     # swift-testing unit tests
 bash adapters/test.sh   # adapter self-check
 ```
 
-Builds with Command Line Tools alone. The Makefile pins the macOS 26.5 SDK because the 27 SDK's SwiftUI macros need a plugin that only ships with Xcode; with Xcode installed, `swift build` and `Package.swift` work directly.
+Needs Xcode (the macOS 27 SDK's SwiftUI macros ship only with it); `swift build` and `Package.swift` work directly.
 
 | File | Role |
 |---|---|
-| `adapters/claude-code.sh` | statusLine wrapper, writes normalized JSON |
-| `install.sh` | copies adapter, patches `~/.claude/settings.json` |
+| `adapters/claude-code.sh` | statusLine wrapper, dumps raw JSON, passes through |
+| `NotchRate/Statusline.swift` | normalizes the raw dump, installs adapter + patches `~/.claude/settings.json` |
 | `NotchRate/UsageStore.swift` | watches `~/.notch-usage`, decodes snapshots |
 | `NotchRate/UsagePoller.swift` | polls the OAuth usage endpoint, refreshes the token |
 | `NotchRate/History.swift` | history log, week and trend stats |

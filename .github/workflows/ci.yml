@@ -17,4 +17,4 @@ jobs:
       - name: Test
         run: swift test
       - name: Adapter checks
-        run: brew install jq && bash adapters/test.sh
+        run: bash adapters/test.sh

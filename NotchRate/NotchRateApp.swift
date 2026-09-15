@@ -6,11 +6,13 @@ struct NotchRateApp: App {
     @Environment(\.openSettings) private var openSettings
     @AppStorage(Pref.menuBarText) private var menuBarText = false
     @StateObject private var updates = UpdateCheck()
+    @State private var connected = Statusline.isInstalled
 
     var body: some Scene {
         MenuBarExtra {
             Text(delegate.summary)
             Divider()
+            if !connected { Button("Connect Claude Code status line…") { connect() } }
             if let u = updates.latest { Button("Update available: \(u.version)…") { NSWorkspace.shared.open(u.url) } }
             Button("Settings…") { NSApp.activate(); openSettings() }
             Button("Quit NotchRate") { NSApp.terminate(nil) }
@@ -18,6 +20,14 @@ struct NotchRateApp: App {
             if menuBarText { Text(delegate.summary) } else { Image(systemName: "gauge.with.dots.needle.33percent") }
         }
         Settings { SettingsView() }
+    }
+
+    private func connect() {
+        do { try Statusline.install(); connected = true } catch { NSAlert(error: error).runModal(); return }
+        let a = NSAlert()
+        a.messageText = "Status line connected"
+        a.informativeText = "Restart Claude Code to start receiving cost and context data."
+        a.runModal()
     }
 }
 
@@ -43,6 +53,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Pref.register()
         NSApp.setActivationPolicy(.accessory)
         Notifier.requestAuthorization()
+        Statusline.refreshIfInstalled()
 
         store = UsageStore()
         store.onUpdate = { [weak self] old, new in
