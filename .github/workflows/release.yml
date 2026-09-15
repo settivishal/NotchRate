@@ -14,13 +14,10 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build app bundle
         run: |
-          swift build -c release
-          mkdir -p NotchRate.app/Contents/MacOS
-          cp .build/release/NotchRate NotchRate.app/Contents/MacOS/
-          cp Info.plist NotchRate.app/Contents/
-          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${GITHUB_REF_NAME#v}" NotchRate.app/Contents/Info.plist || true
-          codesign --force --sign - NotchRate.app
-          ditto -c -k --keepParent NotchRate.app NotchRate-${GITHUB_REF_NAME}.zip
+          make app
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${GITHUB_REF_NAME#v}" build/NotchRate.app/Contents/Info.plist || true
+          codesign --force --sign - build/NotchRate.app
+          ditto -c -k --keepParent build/NotchRate.app NotchRate-${GITHUB_REF_NAME}.zip
           shasum -a 256 NotchRate-${GITHUB_REF_NAME}.zip > NotchRate-${GITHUB_REF_NAME}.zip.sha256
       - name: Attach to release
         run: gh release upload "$GITHUB_REF_NAME" NotchRate-${GITHUB_REF_NAME}.zip NotchRate-${GITHUB_REF_NAME}.zip.sha256 --clobber || gh release create "$GITHUB_REF_NAME" NotchRate-${GITHUB_REF_NAME}.zip NotchRate-${GITHUB_REF_NAME}.zip.sha256 --generate-notes

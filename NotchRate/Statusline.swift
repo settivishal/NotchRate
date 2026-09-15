@@ -46,7 +46,7 @@ enum Statusline {
     /// Copies the bundled adapter out of the app (so moving the app does not break the hook)
     /// and points statusLine.command at it. Previous settings.json kept as settings.json.bak.
     static func install() throws {
-        let src = Bundle.main.url(forResource: "claude-code", withExtension: "sh")!
+        guard let src = Bundle.main.url(forResource: "claude-code", withExtension: "sh") else { throw CocoaError(.fileNoSuchFile) }
         let fm = FileManager.default
         try fm.createDirectory(at: adapter.deletingLastPathComponent(), withIntermediateDirectories: true)
         if fm.fileExists(atPath: adapter.path) { try fm.removeItem(at: adapter) }
