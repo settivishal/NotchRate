@@ -5,11 +5,13 @@ struct NotchRateApp: App {
     @NSApplicationDelegateAdaptor private var delegate: AppDelegate
     @Environment(\.openSettings) private var openSettings
     @AppStorage(Pref.menuBarText) private var menuBarText = false
+    @StateObject private var updates = UpdateCheck()
 
     var body: some Scene {
         MenuBarExtra {
             Text(delegate.summary)
             Divider()
+            if let u = updates.latest { Button("Update available: \(u.version)…") { NSWorkspace.shared.open(u.url) } }
             Button("Settings…") { NSApp.activate(); openSettings() }
             Button("Quit NotchRate") { NSApp.terminate(nil) }
         } label: {
