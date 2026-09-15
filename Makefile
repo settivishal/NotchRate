@@ -1,13 +1,8 @@
-# CLT-only build. 27.0 SDK needs Xcode's SwiftUI macro plugin; 26.5 SDK does not.
-CLT   = /Library/Developer/CommandLineTools
-SDK  ?= $(CLT)/SDKs/MacOSX26.5.sdk
-FW    = $(CLT)/Library/Developer/Frameworks
 APP   = build/NotchRate.app
-SWIFT = SDKROOT=$(SDK) swift
 
 .PHONY: build app run install test clean
 build:
-	$(SWIFT) build --build-system native -c release
+	swift build -c release
 
 app: build
 	rm -rf $(APP); mkdir -p $(APP)/Contents/MacOS
@@ -27,7 +22,7 @@ install: app
 	open /Applications/NotchRate.app
 
 test:
-	$(SWIFT) test --build-system native -Xswiftc -F$(FW) -Xlinker -F$(FW) -Xlinker -rpath -Xlinker $(FW)
+	swift test
 
 clean:
 	rm -rf .build build
