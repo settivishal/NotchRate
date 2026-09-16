@@ -14,6 +14,17 @@ final class NotchPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
     }
 
+    /// Two-finger horizontal swipe; +1 = next page, -1 = previous. One call per gesture.
+    var onSwipe: ((Int) -> Void)?
+    private var swiped = false
+
+    override func scrollWheel(with event: NSEvent) {
+        if event.phase == .began { swiped = false }
+        guard !swiped, event.momentumPhase == [], abs(event.scrollingDeltaX) > 20, abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) else { return }
+        swiped = true
+        onSwipe?(event.scrollingDeltaX < 0 ? 1 : -1)
+    }
+
     override var canBecomeKey: Bool { false }
     override var canBecomeMain: Bool { false }
 }

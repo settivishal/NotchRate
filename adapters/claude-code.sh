@@ -1,16 +1,55 @@
 #!/bin/bash
-# Claude Code statusLine adapter for NotchRate.
-# Dumps the statusLine JSON to ~/.notch-usage/claude-code.raw (the app parses it),
-# then hands the same JSON to the downstream statusline (default: ccstatusline).
+# Claude Code hooks adapter for NotchRate. Modes:
+#   (none)      statusLine: dump the JSON to ~/.notch-usage/claude-code.raw (the app parses it),
+#               then hand the same JSON to the downstream statusline (default: ccstatusline).
+#   permission  PermissionRequest: publish the request to pending/, wait up to
+#               NOTCH_APPROVAL_WAIT seconds for the app to write an answer, print the decision.
+#               No answer in time -> exit silently so the terminal prompt shows as usual.
+#   clear       Any later hook: drop this session's pending request (the user answered in the terminal).
 set -u
 
 OUT_DIR="${NOTCH_USAGE_DIR:-$HOME/.notch-usage}"
 DOWNSTREAM="${NOTCH_DOWNSTREAM:-ccstatusline}"
+WAIT="${NOTCH_APPROVAL_WAIT:-15}"
+
+mkdir -p "$OUT_DIR"
+
+# Files are keyed by session so parallel sessions never clear each other.
+session_id() { printf '%s' "$1" | sed -n 's/.*"session_id": *"\([^"]*\)".*/\1/p' | head -1; }
+
+case "${1:-}" in
+  clear)
+    id=$(session_id "$(cat)")
+    rm -f "$OUT_DIR/pending/${id:-*}.raw" "$OUT_DIR/pending/plan-${id:-*}.raw"
+    exit 0
+    ;;
+  permission)
+    mkdir -p "$OUT_DIR/pending" "$OUT_DIR/answer"
+    payload=$(cat)
+    id=$(session_id "$payload"); id=${id:-$$}
+    # Plan approval stays in the terminal; the app only notifies.
+    case "$payload" in *'"tool_name":"ExitPlanMode"'*|*'"tool_name": "ExitPlanMode"'*)
+      printf '%s' "$payload" > "$OUT_DIR/pending/plan-$id.raw"
+      exit 0 ;;
+    esac
+    trap 'rm -f "$OUT_DIR/pending/$id.raw" "$OUT_DIR/answer/$id"' EXIT
+    printf '%s' "$payload" > "$OUT_DIR/pending/$id.raw.tmp" && mv -f "$OUT_DIR/pending/$id.raw.tmp" "$OUT_DIR/pending/$id.raw"
+    i=0
+    while [ ! -f "$OUT_DIR/answer/$id" ] && [ "$i" -lt "$((WAIT * 4))" ]; do
+      sleep 0.25; i=$((i + 1))
+    done
+    [ -f "$OUT_DIR/answer/$id" ] || exit 0
+    case "$(cat "$OUT_DIR/answer/$id")" in
+      allow) printf '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow"}}}' ;;
+      *)     printf '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"deny","message":"Denied from NotchRate"}}}' ;;
+    esac
+    exit 0
+    ;;
+esac
 
 payload=$(cat)
 
 # Atomic write: the app's directory watcher only ever sees complete files.
-mkdir -p "$OUT_DIR"
 printf '%s' "$payload" > "$OUT_DIR/claude-code.raw.tmp" 2>/dev/null && mv -f "$OUT_DIR/claude-code.raw.tmp" "$OUT_DIR/claude-code.raw"
 
 # Never break the terminal statusline, whatever happened above.

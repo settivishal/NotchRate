@@ -38,9 +38,40 @@ enum Statusline {
 
     // MARK: install
 
-    static var isInstalled: Bool {
-        guard let s = try? JSONSerialization.jsonObject(with: Data(contentsOf: settings)) as? [String: Any] else { return false }
-        return (s["statusLine"] as? [String: Any])?["command"] as? String == adapter.path
+    static var isInstalled: Bool { statusLineInstalled && hooksInstalled(current) }
+
+    private static var current: [String: Any] { (try? JSONSerialization.jsonObject(with: Data(contentsOf: settings)) as? [String: Any]) ?? [:] }
+    private static var statusLineInstalled: Bool { (current["statusLine"] as? [String: Any])?["command"] as? String == adapter.path }
+
+    /// Permission island hooks: `permission` blocks on PermissionRequest, `clear` drops stale requests.
+    static let hookEvents: [String: String] = [
+        "PermissionRequest": "permission", "PreToolUse": "clear", "PostToolUse": "clear", "Stop": "clear", "UserPromptSubmit": "clear",
+    ]
+
+    static func hooksInstalled(_ s: [String: Any]) -> Bool {
+        let hooks = s["hooks"] as? [String: Any] ?? [:]
+        return hookEvents.allSatisfy { event, mode in
+            (hooks[event] as? [[String: Any]] ?? []).contains { entry in
+                (entry["hooks"] as? [[String: Any]] ?? []).contains { $0["command"] as? String == "\(adapter.path) \(mode)" }
+            }
+        }
+    }
+
+    /// Adds our hook entries (once) alongside whatever the user already has.
+    static func addHooks(to s: [String: Any]) -> [String: Any] {
+        var s = s
+        var hooks = s["hooks"] as? [String: Any] ?? [:]
+        for (event, mode) in hookEvents {
+            let command = "\(adapter.path) \(mode)"
+            var entries = hooks[event] as? [[String: Any]] ?? []
+            guard !entries.contains(where: { ($0["hooks"] as? [[String: Any]] ?? []).contains { $0["command"] as? String == command } }) else { continue }
+            var hook: [String: Any] = ["type": "command", "command": command]
+            if mode == "permission" { hook["timeout"] = 30 }
+            entries.append(["hooks": [hook]])
+            hooks[event] = entries
+        }
+        s["hooks"] = hooks
+        return s
     }
 
     /// Copies the bundled adapter out of the app (so moving the app does not break the hook)
@@ -58,16 +89,17 @@ enum Statusline {
         line["type"] = "command"
         line["command"] = adapter.path
         s["statusLine"] = line
+        s = addHooks(to: s)
         try fm.createDirectory(at: settings.deletingLastPathComponent(), withIntermediateDirectories: true)
         let bak = settings.appendingPathExtension("bak")
         if fm.fileExists(atPath: settings.path) { try? fm.removeItem(at: bak); try? fm.copyItem(at: settings, to: bak) }
         try JSONSerialization.data(withJSONObject: s, options: [.prettyPrinted, .sortedKeys]).write(to: settings, options: .atomic)
     }
 
-    /// Adapter may change between releases; refresh the installed copy on launch.
+    /// Adapter and hook set may change between releases; refresh the installed copy on launch.
     static func refreshIfInstalled() {
-        guard isInstalled, let src = Bundle.main.url(forResource: "claude-code", withExtension: "sh"),
-              let new = try? Data(contentsOf: src), new != (try? Data(contentsOf: adapter)) else { return }
+        guard statusLineInstalled, let src = Bundle.main.url(forResource: "claude-code", withExtension: "sh"), let new = try? Data(contentsOf: src),
+              new != (try? Data(contentsOf: adapter)) || !hooksInstalled(current) else { return }
         try? install()
     }
 }

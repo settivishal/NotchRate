@@ -4,6 +4,15 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+### Added
+- Agent approvals: Claude Code permission prompts show as an Allow/Deny island on the notch, answered through the `PermissionRequest` hook; terminal prompt takes over after 15 s.
+- "Plan ready for review" notification when Claude Code presents a plan.
+- Controls page with a Keep Mac awake (caffeinate) toggle, also in the menu bar menu.
+- Icon tab bar and two-finger swipe to switch card pages.
+
+### Changed
+- Connect Claude Code status line… now also installs the hook entries; existing installs are upgraded on launch.
+
 ## [0.2.1] — 2026-09-14
 
 ### Fixed

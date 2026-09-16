@@ -46,6 +46,13 @@ Pro and Max limits are shared across Claude Code, claude.ai chat and Cowork, so 
 | **Overview** | Session and weekly ring gauges (or bars) with reset countdowns, CLI cost, context window %, extra-usage % when enabled, refresh, pin, link to claude.ai usage |
 | **Trends** | 5h and 7d charts, burn rate, "full in ~Xh", usage this window, today's / average daily usage, projected weekly at reset |
 | **This week** | Per-day bars of weekly limit consumed, sessions started, peak session %, limit hits, CLI cost for the week |
+| **Controls** | Keep Mac awake (caffeinate) toggle |
+
+Switch pages with the icon bar at the bottom of the card or a two-finger horizontal swipe.
+
+### Agent approvals
+
+When Claude Code stops for a permission, the badge turns into an **Allow / Deny island** and your answer goes straight back through the `PermissionRequest` hook. Answer within 15 s on the notch; otherwise the usual terminal prompt appears and the island clears itself once you answer there. When Claude presents a plan you get a "Plan ready for review" notification. Both are wired by **Connect Claude Code status line…** (adds `hooks` entries next to `statusLine` in `~/.claude/settings.json`).
 
 Badge colors: green under 60 %, yellow 60–85 %, red above. Greyed out ("offline") when no update arrives for 2 h. Notifications fire when session or weekly usage crosses 85 % and 100 %.
 
@@ -125,6 +132,8 @@ Menu bar gauge icon → **Settings…**
 | Mark offline after | 2 h | 0.5–12 h without an update |
 | Warn at / Alert at | 85 % / 100 % | Notification thresholds per bucket |
 | Pace warning | on | Once per session window when the burn rate reaches 100 % before reset |
+| Allow/Deny island | on | Permission prompts appear on the notch for 15 s before the terminal takes over |
+| Plan ready notification | on | Fires when Claude Code presents a plan for approval |
 
 ## Privacy
 

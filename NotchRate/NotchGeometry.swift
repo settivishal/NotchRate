@@ -24,18 +24,25 @@ struct NotchGeometry {
         topHeight = hasNotch ? screen.safeAreaInsets.top : screen.frame.maxY - screen.visibleFrame.maxY
     }
 
-    var collapsedSize: CGSize {
-        CGSize(width: hasNotch ? notchWidth + 2 * wingWidth : Self.pillWidth, height: topHeight)
+    static let islandWing: CGFloat = 96  // wider wings while an approval request is showing
+    static let tabBar: CGFloat = 18
+
+    var collapsedSize: CGSize { collapsedSize(island: false) }
+
+    func collapsedSize(island: Bool) -> CGSize {
+        let wing = island ? Self.islandWing : wingWidth
+        return CGSize(width: hasNotch ? notchWidth + 2 * wing : island ? 2 * Self.islandWing : Self.pillWidth, height: topHeight)
     }
 
-    /// `tall`: overview has the per-model row.
-    func expandedSize(for page: Page = .overview, tall: Bool = false) -> CGSize {
+    /// `tall`: overview has the per-model row. `banner`: overview shows a pending approval.
+    func expandedSize(for page: Page = .overview, tall: Bool = false, banner: Bool = false) -> CGSize {
         let card = switch page {
-        case .overview: CGSize(width: Self.expandedSize.width, height: Self.expandedSize.height + 24 + (tall ? 18 : 0))
+        case .overview: CGSize(width: Self.expandedSize.width, height: Self.expandedSize.height + 24 + (tall ? 18 : 0) + (banner ? 50 : 0))
         case .trends: CGSize(width: 380, height: 280)
         case .week: CGSize(width: 380, height: 240)
+        case .controls: CGSize(width: Self.expandedSize.width, height: 90)
         }
-        return CGSize(width: max(card.width, collapsedSize.width), height: topHeight + card.height)
+        return CGSize(width: max(card.width, collapsedSize(island: true).width), height: topHeight + card.height + Self.tabBar)
     }
 
     /// Top-center frame for a window of `size` on this screen.

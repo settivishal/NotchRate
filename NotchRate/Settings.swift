@@ -18,13 +18,15 @@ enum Pref {
     static let fullPct = "fullPct"             // Double, default 100: second notification threshold
     static let paceWarn = "paceWarn"           // Bool, default true: warn when pace hits 100% before reset
     static let hotkey = "hotkey"               // Bool, default true: ⌃⌥N toggles the card
+    static let planNotify = "planNotify"       // Bool, default true: notify when Claude Code presents a plan
+    static let approvals = "approvals"         // Bool, default true: Allow/Deny island for permission prompts
     static let paceWarnedFor = "paceWarnedFor" // Double: session resets_at already warned about
 
     static func register() {
         UserDefaults.standard.register(defaults: [
             staleHours: 2.0, hoverDelay: 0.3, allDisplays: true, wingWidth: 44.0, showWeekly: false, hideBadge: false,
             ringGauges: true, pollSeconds: 60.0, cardRadius: 28.0, badgeCountdown: false, badgeRing: false,
-            menuBarText: false, warnPct: 85.0, fullPct: 100.0, paceWarn: true, hotkey: true,
+            menuBarText: false, warnPct: 85.0, fullPct: 100.0, paceWarn: true, hotkey: true, planNotify: true, approvals: true,
         ])
     }
     static var staleAfter: TimeInterval { UserDefaults.standard.double(forKey: staleHours) * 3600 }
@@ -48,6 +50,8 @@ struct SettingsView: View {
     @AppStorage(Pref.fullPct) private var fullPct = 100.0
     @AppStorage(Pref.paceWarn) private var paceWarn = true
     @AppStorage(Pref.hotkey) private var hotkey = true
+    @AppStorage(Pref.planNotify) private var planNotify = true
+    @AppStorage(Pref.approvals) private var approvals = true
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -91,8 +95,13 @@ struct SettingsView: View {
                 Slider(value: $fullPct, in: 60...100, step: 1) { Text("Alert at \(Int(fullPct))%") }
                 Toggle("Warn when pace hits 100% before reset", isOn: $paceWarn)
             }
+            Section("Claude Code") {
+                Toggle("Allow/Deny island for permission prompts", isOn: $approvals)
+                Text("Answer on the notch within \(Int(Approvals.wait))s, or in the terminal as usual.").font(.caption).foregroundStyle(.secondary)
+                Toggle("Notify when a plan is ready for review", isOn: $planNotify)
+            }
         }
         .formStyle(.grouped)
-        .frame(width: 400, height: 640)
+        .frame(width: 400, height: 740)
     }
 }

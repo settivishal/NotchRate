@@ -43,3 +43,17 @@ private var sample: [String: Any] {
     #expect(out?["cost_usd"] as? Double == 1.23)
     #expect(!FileManager.default.fileExists(atPath: dir.appending(path: "claude-code.raw").path))
 }
+
+@Test func addHooksIsIdempotentAndKeepsExisting() {
+    let existing: [String: Any] = ["hooks": ["Stop": [["hooks": [["type": "command", "command": "say done"]]]]]]
+    let once = Statusline.addHooks(to: existing)
+    #expect(Statusline.hooksInstalled(once))
+    #expect(!Statusline.hooksInstalled(existing))
+    let stop = (once["hooks"] as? [String: Any])?["Stop"] as? [[String: Any]]
+    #expect(stop?.count == 2)
+    let twice = Statusline.addHooks(to: once)
+    #expect(((twice["hooks"] as? [String: Any])?["Stop"] as? [[String: Any]])?.count == 2)
+    let perm = ((twice["hooks"] as? [String: Any])?["PermissionRequest"] as? [[String: Any]])?.first?["hooks"] as? [[String: Any]]
+    #expect(perm?.first?["timeout"] as? Int == 30)
+    #expect((perm?.first?["command"] as? String)?.hasSuffix("claude-code.sh permission") == true)
+}

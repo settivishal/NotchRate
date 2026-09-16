@@ -43,12 +43,15 @@ enum Notifier {
                 msgs.append(m)
                 defaults.set(resets, forKey: Pref.paceWarnedFor)
             }
-            for msg in msgs {
-                let content = UNMutableNotificationContent()
-                content.title = snap.tool == "claude-code" ? "Claude" : snap.tool
-                content.body = msg
-                UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
-            }
+            for msg in msgs { post(title: snap.tool == "claude-code" ? "Claude" : snap.tool, body: msg) }
         }
+    }
+
+    static func post(title: String, body: String) {
+        guard Bundle.main.bundleIdentifier != nil else { return }
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        UNUserNotificationCenter.current().add(UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
     }
 }
