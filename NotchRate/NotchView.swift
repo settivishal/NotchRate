@@ -110,6 +110,7 @@ struct NotchView: View {
             }
             .frame(width: size.width, height: size.height)
             .contentShape(Rectangle())
+            .pointerStyle(.default)  // no I-beam over labels
             .animation(animation, value: state.expanded)
             .animation(animation, value: state.page)
             .onHover(perform: hover)
@@ -594,10 +595,8 @@ struct NavButton: View {
         .scaleEffect(hovered ? 1.08 : 1)
         .contentShape(Capsule())
         .onTapGesture(perform: action)
-        .onHover { on in
-            hovered = on
-            on ? NSCursor.pointingHand.push() : NSCursor.pop()
-        }
+        .onHover { hovered = $0 }
+        .pointerStyle(.default)  // solid arrow; push/pop of NSCursor was overridden in the non-key panel
         .animation(.easeOut(duration: 0.12), value: hovered)
     }
 }
