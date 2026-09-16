@@ -41,6 +41,8 @@ final class NotchState {
     var caffeineUntil: Date? {
         didSet {
             Caffeine.on = caffeinated
+            if caffeinated != (oldValue != nil) { caffeineStarted = .now }
+            onCaffeineChange?()
             caffeineTimer?.cancel()
             guard let until = caffeineUntil, until != .distantFuture else { return }
             caffeineTimer = Task { [weak self] in
@@ -51,6 +53,8 @@ final class NotchState {
         }
     }
     var caffeinated: Bool { caffeineUntil != nil }
+    var caffeineStarted = Date.now  // ring progress = remaining / (until - started)
+    var onCaffeineChange: (() -> Void)?  // collapsed window width changes with the blob
     private var caffeineTimer: Task<Void, Never>?
     init(geometry: NotchGeometry) { self.geometry = geometry }
 }
@@ -82,11 +86,17 @@ struct NotchView: View {
     var body: some View {
         let geo = state.geometry
         let size = state.expanded ? geo.expandedSize(for: state.page, tall: state.tallCard, plan: state.approval?.isPlan == true)
-                                  : geo.collapsedSize(island: state.approval != nil)
+                                  : geo.collapsedSize(island: state.approval != nil, blob: state.caffeinated)
         TimelineView(.periodic(from: .now, by: state.approval == nil && !(state.expanded && state.page == .caffeine) ? 60 : 1)) { ctx in
+            let blob = !state.expanded && state.caffeinated
             ZStack(alignment: .top) {
                 NotchShape(topRadius: geo.hasNotch ? 6 : 0, bottomRadius: state.expanded ? cardRadius : 12)
                     .fill(.black)
+                    .padding(.horizontal, blob ? geo.blobWidth + NotchGeometry.blobGap : 0)  // leave room for the side blob
+                if blob {
+                    caffeineBlob(now: ctx.date)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                }
                 if state.expanded, let snap = store.primary {
                     let level = snap.level(now: ctx.date, staleAfter: staleHours * 3600)
                     VStack(spacing: 0) {
@@ -227,6 +237,24 @@ struct NotchView: View {
         .padding(.bottom, 4)
     }
 
+    /// Detached circle beside the badge, iOS Dynamic Island style: orange ring counts down, cup inside.
+    private func caffeineBlob(now: Date) -> some View {
+        let d = state.geometry.blobWidth
+        let progress: Double = state.caffeineUntil.map { until in
+            until == .distantFuture ? 1 : max(0, min(1, until.timeIntervalSince(now) / until.timeIntervalSince(state.caffeineStarted)))
+        } ?? 0
+        return ZStack {
+            Circle().fill(.black)
+            Circle().stroke(.orange.opacity(0.25), lineWidth: 2.5)
+            Circle().trim(from: 0, to: progress)
+                .stroke(.orange, style: StrokeStyle(lineWidth: 2.5, lineCap: .round)).rotationEffect(.degrees(-90))
+            Image(systemName: "cup.and.saucer.fill").resizable().scaledToFit().frame(width: d * 0.38).foregroundStyle(.orange)
+        }
+        .padding(5)
+        .frame(width: d, height: d)
+        .onTapGesture { setPage(.caffeine); setExpanded(true) }
+    }
+
     private static let presets: [(String, TimeInterval)] = [("30m", 1800), ("1h", 3600), ("2h", 7200), ("∞", .infinity)]
 
     private func caffeinePage(now: Date) -> some View {
@@ -279,7 +307,6 @@ struct NotchView: View {
                         } else {
                             Circle().fill(session.color).frame(width: 8, height: 8)
                         }
-                        if state.caffeinated { Image(systemName: "cup.and.saucer.fill").resizable().scaledToFit().frame(width: 10, height: 10).foregroundStyle(.orange) }
                     }
                 }
             }

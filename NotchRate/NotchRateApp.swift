@@ -72,6 +72,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         state = NotchState(geometry: NotchGeometry(screen: NSScreen.main ?? NSScreen.screens[0]))
+        state.onCaffeineChange = { [weak self] in
+            guard let self, !state.expanded else { return }
+            panel.setFrame(collapsedFrame, display: true)
+        }
         panel = NotchPanel()
         panel.contentView = NSHostingView(rootView: NotchView(store: store, state: state,
                                                               setExpanded: { [weak self] in self?.setExpanded($0) },
@@ -101,7 +105,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateVisibility(screen: screen)
     }
 
-    private var collapsedFrame: NSRect { state.geometry.frame(for: state.geometry.collapsedSize(island: state.approval != nil)) }
+    private var collapsedFrame: NSRect { state.geometry.frame(for: state.geometry.collapsedSize(island: state.approval != nil, blob: state.caffeinated)) }
 
     private func updateVisibility(screen: NSScreen?) {
         let empty = store.primary == nil && state.approval == nil
