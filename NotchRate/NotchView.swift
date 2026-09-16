@@ -182,7 +182,7 @@ struct NotchView: View {
                 }
                 if let plan = r.plan {
                     ScrollView {
-                        Text((try? AttributedString(markdown: plan, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(plan))
+                        Text(planText(plan))
                             .font(.caption2).foregroundStyle(.secondary).textSelection(.enabled)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -377,7 +377,7 @@ struct NotchView: View {
     private func header<Trailing: View>(@ViewBuilder trailing: () -> Trailing) -> some View {
         let pages = state.page.tab.pages
         return HStack(spacing: 6) {
-            if pages.count > 1 {
+            if pages.count > 1, pages.contains(state.page) {
                 ForEach(pages, id: \.self) { p in
                     NavButton(label: p.title, tint: state.page == p ? .white : nil) { setPage(p) }
                 }
@@ -553,6 +553,24 @@ struct NotchView: View {
         if secs <= 0 { return "now" }
         if secs < 24 * 3600 { return "in " + relative(epoch, now: now) }
         return date.formatted(.dateTime.weekday(.abbreviated).hour())
+    }
+
+    /// Headings bold + white, inline markdown for the rest; blank lines kept.
+    private func planText(_ plan: String) -> AttributedString {
+        var out = AttributedString()
+        for (i, line) in plan.split(separator: "\n", omittingEmptySubsequences: false).enumerated() {
+            if i > 0 { out += AttributedString("\n") }
+            let str = String(line)
+            if let range = str.range(of: #"^#{1,6}\s+"#, options: .regularExpression) {
+                var h = AttributedString(str[range.upperBound...])
+                h.font = .caption.bold()
+                h.foregroundColor = .white
+                out += h
+            } else {
+                out += (try? AttributedString(markdown: str, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(str)
+            }
+        }
+        return out
     }
 
     /// h:mm:ss for the caffeine timer.
