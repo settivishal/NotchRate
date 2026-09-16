@@ -46,6 +46,7 @@ Pro and Max limits are shared across Claude Code, claude.ai chat and Cowork, so 
 | **Claude · Overview** | Session and weekly ring gauges (or bars) with reset countdowns, CLI cost, context window %, extra-usage % when enabled, refresh, pin, link to claude.ai usage |
 | **Claude · Trends** | 5h and 7d charts, burn rate, "full in ~Xh", usage this window, today's / average daily usage, projected weekly at reset |
 | **Claude · Week** | Per-day bars of weekly limit consumed, sessions started, peak session %, limit hits, CLI cost for the week |
+| **Shelf** | Drop files on the notch; they stack here. Drag out anywhere (copies), double-click opens, × removes. Persists across launches |
 | **Caffeinate** | Keep the Mac awake for 30m / 1h / 2h / until turned off; auto-off when the timer ends; cup shows in the badge while awake |
 
 The icon bar under the notch (or a two-finger swipe) switches categories; pills in the header move between a category's pages.

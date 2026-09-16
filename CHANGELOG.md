@@ -4,6 +4,10 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+### Added
+- Shelf tab: drop files on the notch, drag them out anywhere later; persisted, tab icon shows the count.
+- Caffeinate shows as a detached side blob with a countdown ring beside the badge (iOS-style); cup removed from the badge.
+
 ## [0.5.0] — 2026-09-16
 
 ### Added

@@ -47,6 +47,7 @@ struct NotchGeometry {
         case .trends: CGSize(width: 380, height: 280)
         case .week: CGSize(width: 380, height: 240)
         case .caffeine: CGSize(width: Self.expandedSize.width, height: Self.expandedSize.height + 24)  // same as overview
+        case .shelf: CGSize(width: Self.expandedSize.width, height: 170)
         }
         return CGSize(width: max(card.width, collapsedSize(island: true, blob: true).width), height: topHeight + card.height + Self.tabBar)
     }

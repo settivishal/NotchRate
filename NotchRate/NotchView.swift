@@ -1,27 +1,30 @@
 import Charts
 import SwiftUI
+import UniformTypeIdentifiers
 
 /// Bottom bar categories. Each owns one or more pages; swipe moves within a tab.
 enum Tab: CaseIterable {
-    case claude, caffeine
+    case claude, caffeine, shelf
     var icon: String {
         switch self {
         case .claude: "gauge.with.dots.needle.33percent"
         case .caffeine: "cup.and.saucer.fill"
+        case .shelf: "tray.full"
         }
     }
     var pages: [Page] { Page.allCases.filter { $0.tab == self && $0 != .approval } }  // approval page is opened by a request, never navigated to
 }
 
 enum Page: CaseIterable {
-    case overview, trends, week, caffeine, approval
-    var tab: Tab { self == .caffeine ? .caffeine : .claude }
+    case overview, trends, week, caffeine, shelf, approval
+    var tab: Tab { self == .caffeine ? .caffeine : self == .shelf ? .shelf : .claude }
     var title: String {
         switch self {
         case .overview: "Overview"
         case .trends: "Trends"
         case .week: "Week"
         case .caffeine: "Caffeinate"
+        case .shelf: "Shelf"
         case .approval: "Approval"
         }
     }
@@ -62,6 +65,7 @@ final class NotchState {
 struct NotchView: View {
     let store: UsageStore
     let state: NotchState
+    let shelf: Shelf
     var setExpanded: (Bool) -> Void
     var setPage: (Page) -> Void
     var refresh: () -> Void
@@ -78,6 +82,7 @@ struct NotchView: View {
     @AppStorage(Pref.badgeRing) private var badgeRing = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hoverTask: Task<Void, Never>?
+    @State private var dropTargeted = false
 
     private var animation: Animation {
         reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.4, dampingFraction: 0.8)
@@ -109,6 +114,7 @@ struct NotchView: View {
                         case .trends: trends(snap, now: ctx.date)
                         case .week: week(snap, now: ctx.date)
                         case .caffeine: caffeinePage(now: ctx.date)
+                        case .shelf: shelfPage
                         case .approval: approvalPage(now: ctx.date)
                         }
                     }
@@ -121,11 +127,31 @@ struct NotchView: View {
             .frame(width: size.width, height: size.height)
             .contentShape(Rectangle())
             .pointerStyle(.default)  // no I-beam over labels
+            .overlay {
+                if dropTargeted {
+                    NotchShape(topRadius: geo.hasNotch ? 6 : 0, bottomRadius: state.expanded ? cardRadius : 12).stroke(.orange, lineWidth: 2)
+                }
+            }
+            .onDrop(of: [.fileURL], isTargeted: $dropTargeted, perform: drop)
+            .onChange(of: dropTargeted) { _, on in
+                // Hover does not fire during a drag; open the shelf so the drop lands somewhere visible.
+                if on, !state.expanded { setPage(.shelf); setExpanded(true) }
+            }
             .animation(animation, value: state.expanded)
             .animation(animation, value: state.page)
             .onHover(perform: hover)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private func drop(_ providers: [NSItemProvider]) -> Bool {
+        for p in providers where p.hasItemConformingToTypeIdentifier(UTType.fileURL.identifier) {
+            _ = p.loadObject(ofClass: URL.self) { url, _ in
+                guard let url else { return }
+                Task { @MainActor in shelf.add([url]) }
+            }
+        }
+        return !providers.isEmpty
     }
 
     private func hover(_ inside: Bool) {
@@ -229,8 +255,15 @@ struct NotchView: View {
         HStack(spacing: 8) {
             ForEach(Tab.allCases, id: \.self) { t in
                 let awake = t == .caffeine && state.caffeinated  // glows on every tab so the state is visible from Claude too
-                NavButton(icon: t.icon, tint: awake ? .orange : state.page.tab == t ? .white : nil) { setPage(t.pages[0]) }
+                let count = t == .shelf ? shelf.items.count : 0
+                NavButton(icon: count == 0 && t == .shelf ? "tray" : t.icon, tint: awake ? .orange : state.page.tab == t ? .white : nil) { setPage(t.pages[0]) }
                     .shadow(color: awake ? .orange.opacity(0.8) : .clear, radius: 6)
+                    .overlay(alignment: .topTrailing) {
+                        if count > 0 {
+                            Text("\(count)").font(.system(size: 8, weight: .bold)).foregroundStyle(.black)
+                                .padding(.horizontal, 3).frame(height: 11).background(.orange, in: Capsule()).offset(x: 4, y: -3)
+                        }
+                    }
             }
         }
         .padding(.top, 6)
@@ -253,6 +286,30 @@ struct NotchView: View {
         .padding(5)
         .frame(width: d, height: d)
         .onTapGesture { setPage(.caffeine); setExpanded(true) }
+    }
+
+    // MARK: shelf
+
+    private var shelfPage: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            header {
+                if !shelf.items.isEmpty { NavButton(icon: "trash", label: "Clear") { shelf.clear() } }
+            }
+            if shelf.items.isEmpty {
+                Text("Drop files here").font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                ScrollView {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 5), spacing: 8) {
+                        ForEach(shelf.items, id: \.self) { url in ShelfItem(url: url) { shelf.remove(url) } }
+                    }
+                }
+            }
+        }
+        .padding(.horizontal, 22)
+        .padding(.bottom, 14)
+        .foregroundStyle(.white)
+        .transition(.opacity)
     }
 
     private static let presets: [(String, TimeInterval)] = [("30m", 1800), ("1h", 3600), ("2h", 7200), ("∞", .infinity)]
@@ -643,5 +700,33 @@ struct NavButton: View {
         .onHover { hovered = $0 }
         .pointerStyle(.default)  // solid arrow; push/pop of NSCursor was overridden in the non-key panel
         .animation(.easeOut(duration: 0.12), value: hovered)
+    }
+}
+
+/// One shelf cell: drag out anywhere (Finder copies), double-click opens, × on hover removes.
+struct ShelfItem: View {
+    let url: URL
+    let remove: () -> Void
+    @State private var hovered = false
+
+    var body: some View {
+        VStack(spacing: 2) {
+            Image(nsImage: NSWorkspace.shared.icon(forFile: url.path)).resizable().frame(width: 36, height: 36)
+            Text(url.lastPathComponent).font(.system(size: 9)).lineLimit(1).truncationMode(.middle).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(4)
+        .background(.white.opacity(hovered ? 0.1 : 0), in: RoundedRectangle(cornerRadius: 8))
+        .overlay(alignment: .topTrailing) {
+            if hovered { NavButton(icon: "xmark", action: remove).scaleEffect(0.7).offset(x: 6, y: -6) }
+        }
+        .onHover { hovered = $0 }
+        .onTapGesture(count: 2) { NSWorkspace.shared.open(url) }
+        .onDrag {
+            // A file-URL item, not the file's bytes: Finder then copies the original with its name.
+            let p = NSItemProvider(object: url as NSURL)
+            p.suggestedName = url.lastPathComponent
+            return p
+        }
     }
 }
