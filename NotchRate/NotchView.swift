@@ -83,7 +83,7 @@ struct NotchView: View {
         let geo = state.geometry
         let size = state.expanded ? geo.expandedSize(for: state.page, tall: state.tallCard, plan: state.approval?.isPlan == true)
                                   : geo.collapsedSize(island: state.approval != nil)
-        TimelineView(.periodic(from: .now, by: state.approval == nil ? 60 : 1)) { ctx in
+        TimelineView(.periodic(from: .now, by: state.approval == nil && !(state.expanded && state.page == .caffeine) ? 60 : 1)) { ctx in
             ZStack(alignment: .top) {
                 NotchShape(topRadius: geo.hasNotch ? 6 : 0, bottomRadius: state.expanded ? cardRadius : 12)
                     .fill(.black)
@@ -217,7 +217,9 @@ struct NotchView: View {
     private var tabBar: some View {
         HStack(spacing: 8) {
             ForEach(Tab.allCases, id: \.self) { t in
-                NavButton(icon: t.icon, tint: state.page.tab == t ? (t == .caffeine && state.caffeinated ? .orange : .white) : nil) { setPage(t.pages[0]) }
+                let awake = t == .caffeine && state.caffeinated  // glows on every tab so the state is visible from Claude too
+                NavButton(icon: t.icon, tint: awake ? .orange : state.page.tab == t ? .white : nil) { setPage(t.pages[0]) }
+                    .shadow(color: awake ? .orange.opacity(0.8) : .clear, radius: 6)
             }
         }
         .padding(.top, 6)
@@ -227,22 +229,23 @@ struct NotchView: View {
     private static let presets: [(String, TimeInterval)] = [("30m", 1800), ("1h", 3600), ("2h", 7200), ("∞", .infinity)]
 
     private func caffeinePage(now: Date) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            header {
-                if let until = state.caffeineUntil {
-                    Text(until == .distantFuture ? "awake until turned off" : "awake · \(relative(until.timeIntervalSince1970, now: now)) left")
-                } else {
-                    Text("sleeping normally")
-                }
-            }
-            HStack(spacing: 6) {
-                NavButton(icon: "moon", label: "Off", tint: state.caffeinated ? nil : .white) { state.caffeineUntil = nil }
+        VStack(alignment: .leading, spacing: 8) {
+            header { Text(state.caffeinated ? "Mac stays awake" : "sleeping normally") }
+            // Big countdown in the middle; ∞ for "until turned off".
+            Text(state.caffeineUntil.map { $0 == .distantFuture ? "∞" : countdown($0, now: now) } ?? "OFF")
+                .font(.system(size: 32, weight: .bold, design: .rounded)).monospacedDigit()
+                .foregroundStyle(state.caffeinated ? .orange : .gray)
+                .frame(maxWidth: .infinity)
+                .padding(.top, 2)
+            HStack(spacing: 8) {
+                NavButton(icon: "moon", label: "Off", large: true, tint: state.caffeinated ? nil : .white) { state.caffeineUntil = nil }
                 ForEach(Self.presets, id: \.0) { name, secs in
                     let target: Date = secs.isInfinite ? .distantFuture : now.addingTimeInterval(secs)
                     let selected = state.caffeineUntil.map { secs.isInfinite ? $0 == .distantFuture : abs($0.timeIntervalSince(target)) < 60 } ?? false
-                    NavButton(icon: "cup.and.saucer.fill", label: name, tint: selected ? .orange : nil) { state.caffeineUntil = target }
+                    NavButton(label: name, large: true, tint: selected ? .orange : nil) { state.caffeineUntil = target }
                 }
             }
+            .frame(maxWidth: .infinity)
         }
         .padding(.horizontal, 22)
         .padding(.bottom, 14)
@@ -551,6 +554,12 @@ struct NotchView: View {
         return date.formatted(.dateTime.weekday(.abbreviated).hour())
     }
 
+    /// h:mm:ss for the caffeine timer.
+    private func countdown(_ until: Date, now: Date) -> String {
+        let secs = max(0, Int(until.timeIntervalSince(now)))
+        return secs >= 3600 ? String(format: "%d:%02d:%02d", secs / 3600, secs % 3600 / 60, secs % 60) : String(format: "%02d:%02d", secs / 60, secs % 60)
+    }
+
     private func relative(_ epoch: Double, now: Date) -> String {
         let secs = Int(abs(now.timeIntervalSince1970 - epoch))
         let d = secs / 86400, h = (secs % 86400) / 3600, m = (secs % 3600) / 60
@@ -563,13 +572,14 @@ struct NavButton: View {
     var icon: String? = nil
     var label: String? = nil
     var spinning = false
+    var large = false        // caffeine presets: taller pill, bigger text
     var tint: Color? = nil  // resting color; default gray
     let action: () -> Void
     @State private var hovered = false
 
     var body: some View {
         HStack(spacing: 4) {
-            if let label { Text(label).font(.caption) }
+            if let label { Text(label).font(large ? .callout.weight(.semibold) : .caption) }
             if let icon {
                 Image(systemName: icon).resizable().scaledToFit().fontWeight(.bold)
                     .frame(width: 11, height: 11)  // every glyph fills the same box
@@ -578,8 +588,8 @@ struct NavButton: View {
             }
         }
         .foregroundStyle(hovered ? .white : tint ?? .gray)
-        .padding(.horizontal, label == nil ? 0 : 9)
-        .frame(width: label == nil ? 24 : nil, height: 24)
+        .padding(.horizontal, label == nil ? 0 : large ? 14 : 9)
+        .frame(width: label == nil ? 24 : nil, height: large ? 32 : 24)
         .background((tint ?? .white).opacity(hovered ? 0.3 : 0.1), in: Capsule())
         .scaleEffect(hovered ? 1.08 : 1)
         .contentShape(Capsule())
