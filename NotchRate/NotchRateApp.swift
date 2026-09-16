@@ -78,7 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                               setPage: { [weak self] in self?.setPage($0) },
                                                               refresh: { [weak self] in self?.refresh() },
                                                               togglePin: { [weak self] in self?.togglePin() },
-                                                              answer: { [weak self] in self?.approvals.answer($0, allow: $1) }))
+                                                              answer: { [weak self] in self?.approvals.answer($0, $1) }))
         panel.onSwipe = { [weak self] in self?.swipe($0) }
         HotKey.set(enabled: UserDefaults.standard.bool(forKey: Pref.hotkey)) { [weak self] in self?.toggleFromHotkey() }
 
@@ -116,7 +116,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let new, !new.isPlan, new.id != state.approval?.id { Notifier.post(title: "Claude", body: "\(new.tool) needs permission") }
         state.approval = new
         if state.expanded {
-            if state.page == .overview { setPage(.overview) }  // resize for the banner
+            setPage(new == nil ? .overview : .approval)
         } else {
             panel.setFrame(collapsedFrame, display: true)
         }
@@ -124,14 +124,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func swipe(_ dir: Int) {
-        let pages = state.page.tab.pages
-        guard state.expanded, let i = pages.firstIndex(of: state.page) else { return }
-        let n = min(max(i + dir, 0), pages.count - 1)
-        if n != i { setPage(pages[n]) }
+        let tabs = Tab.allCases
+        guard state.expanded, let i = tabs.firstIndex(of: state.page.tab) else { return }
+        let n = min(max(i + dir, 0), tabs.count - 1)
+        if n != i { setPage(tabs[n].pages[0]) }
     }
 
     private func expandedSize(for page: Page) -> CGSize {
-        state.geometry.expandedSize(for: page, tall: state.tallCard, banner: page == .overview && state.approval != nil)
+        state.geometry.expandedSize(for: page, tall: state.tallCard, plan: state.approval?.isPlan == true)
     }
 
     /// Window grows before the expand animation and shrinks after the collapse one,
@@ -141,6 +141,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         collapseTask?.cancel()
         guard on != state.expanded else { return }
         if on {
+            if state.approval != nil { state.page = .approval }  // pending request opens on its own page
             panel.setFrame(state.geometry.frame(for: expandedSize(for: state.page)), display: true)
             state.expanded = true
         } else {

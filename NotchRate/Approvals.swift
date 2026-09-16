@@ -12,9 +12,12 @@ final class Approvals {
         let detail: String    // command / path / description, whatever the tool has
         let expires: Date     // hook gives up and the terminal prompt takes over
         let isPlan: Bool
+        let plan: String?     // ExitPlanMode markdown
     }
 
-    nonisolated static let wait: TimeInterval = 15  // keep in sync with NOTCH_APPROVAL_WAIT default in the adapter
+    // Keep in sync with NOTCH_APPROVAL_WAIT / NOTCH_PLAN_WAIT defaults in the adapter.
+    nonisolated static let wait: TimeInterval = 15
+    nonisolated static let planWait: TimeInterval = 90
 
     private(set) var pending: [Request] = []
     var onPlanReady: (() -> Void)?
@@ -46,10 +49,11 @@ final class Approvals {
         source = src
     }
 
-    func answer(_ r: Request, allow: Bool) {
+    /// `decision`: "allow", "allow <mode>" (session setMode, e.g. acceptEdits) or "deny".
+    func answer(_ r: Request, _ decision: String) {
         let dir = directory.deletingLastPathComponent().appending(path: "answer")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        try? (allow ? "allow" : "deny").write(to: dir.appending(path: r.id), atomically: true, encoding: .utf8)
+        try? decision.write(to: dir.appending(path: r.id), atomically: true, encoding: .utf8)
         pending.removeAll { $0.id == r.id }  // hook deletes the file; do not wait for the watcher
         onChange?()
     }
@@ -67,9 +71,9 @@ final class Approvals {
         guard let data = try? Data(contentsOf: url), let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
         let input = json["tool_input"] as? [String: Any] ?? [:]
         let mtime = (try? url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .now
-        let id = url.deletingPathExtension().lastPathComponent
+        let id = url.deletingPathExtension().lastPathComponent, isPlan = id.hasPrefix("plan-")
         return Request(id: id, tool: json["tool_name"] as? String ?? "?",
-                       detail: (["command", "file_path", "description", "url", "prompt"].lazy.compactMap { input[$0] as? String }.first ?? "").prefix(120).description,
-                       expires: mtime.addingTimeInterval(wait), isPlan: id.hasPrefix("plan-"))
+                       detail: (["command", "file_path", "description", "url", "prompt"].lazy.compactMap { input[$0] as? String }.first ?? "").prefix(300).description,
+                       expires: mtime.addingTimeInterval(isPlan ? planWait : wait), isPlan: isPlan, plan: input["plan"] as? String)
     }
 }

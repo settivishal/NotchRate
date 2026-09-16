@@ -10,11 +10,11 @@ enum Tab: CaseIterable {
         case .caffeine: "cup.and.saucer.fill"
         }
     }
-    var pages: [Page] { Page.allCases.filter { $0.tab == self } }
+    var pages: [Page] { Page.allCases.filter { $0.tab == self && $0 != .approval } }  // approval page is opened by a request, never navigated to
 }
 
 enum Page: CaseIterable {
-    case overview, trends, week, caffeine
+    case overview, trends, week, caffeine, approval
     var tab: Tab { self == .caffeine ? .caffeine : .claude }
     var title: String {
         switch self {
@@ -22,6 +22,7 @@ enum Page: CaseIterable {
         case .trends: "Trends"
         case .week: "Week"
         case .caffeine: "Caffeinate"
+        case .approval: "Approval"
         }
     }
 }
@@ -61,7 +62,7 @@ struct NotchView: View {
     var setPage: (Page) -> Void
     var refresh: () -> Void
     var togglePin: () -> Void
-    var answer: (Approvals.Request, Bool) -> Void
+    var answer: (Approvals.Request, String) -> Void  // "allow", "allow <mode>", "deny"
 
     @AppStorage(Pref.hoverDelay) private var hoverDelay = 0.3
     @AppStorage(Pref.staleHours) private var staleHours = 2.0
@@ -80,7 +81,7 @@ struct NotchView: View {
 
     var body: some View {
         let geo = state.geometry
-        let size = state.expanded ? geo.expandedSize(for: state.page, tall: state.tallCard, banner: state.page == .overview && state.approval != nil)
+        let size = state.expanded ? geo.expandedSize(for: state.page, tall: state.tallCard, plan: state.approval?.isPlan == true)
                                   : geo.collapsedSize(island: state.approval != nil)
         TimelineView(.periodic(from: .now, by: state.approval == nil ? 60 : 1)) { ctx in
             ZStack(alignment: .top) {
@@ -98,6 +99,7 @@ struct NotchView: View {
                         case .trends: trends(snap, now: ctx.date)
                         case .week: week(snap, now: ctx.date)
                         case .caffeine: caffeinePage(now: ctx.date)
+                        case .approval: approvalPage(now: ctx.date)
                         }
                     }
                 } else if let r = state.approval {
@@ -145,19 +147,19 @@ struct NotchView: View {
             .frame(width: wing)
             if geo.hasNotch { Color.clear.frame(width: geo.notchWidth) }
             Group {
-                if r.isPlan {
-                    Text("review in terminal").font(.caption2).foregroundStyle(.gray)
-                } else if now < r.expires {
-                    HStack(spacing: 6) {
-                        NavButton(icon: "checkmark", tint: .green) { answer(r, true) }
-                        NavButton(icon: "xmark", tint: .red) { answer(r, false) }
-                    }
-                } else {
+                if now >= r.expires {
                     HStack(spacing: 4) {
                         Image(systemName: "terminal").font(.caption)
                         Text("in terminal").font(.caption2)
                     }
                     .foregroundStyle(.gray)
+                } else if r.isPlan {
+                    Text("hover to review").font(.caption2).foregroundStyle(.gray)
+                } else {
+                    HStack(spacing: 6) {
+                        NavButton(icon: "checkmark", tint: .green) { answer(r, "allow") }
+                        NavButton(icon: "xmark", tint: .red) { answer(r, "deny") }
+                    }
                 }
             }
             .padding(.trailing, geo.hasNotch ? 12 : 0)
@@ -166,24 +168,48 @@ struct NotchView: View {
         .frame(height: geo.topHeight)
     }
 
-    /// Same request on the overview, with room for the command/path.
-    private func approvalBanner(_ r: Approvals.Request, now: Date) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: r.isPlan ? "list.bullet.clipboard" : "exclamationmark.shield.fill").foregroundStyle(.orange)
-            VStack(alignment: .leading, spacing: 1) {
-                Text(r.isPlan ? "Plan ready for review" : "\(r.tool) needs permission").font(.caption).bold()
-                if !r.detail.isEmpty { Text(r.detail).font(.caption2).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle) }
-            }
-            Spacer()
-            if !r.isPlan, now < r.expires {
-                NavButton(icon: "checkmark", label: "Allow", tint: .green) { answer(r, true) }
-                NavButton(icon: "xmark", label: "Deny", tint: .red) { answer(r, false) }
+    /// Full request with the terminal's choices. Plans get the markdown and the three ExitPlanMode options.
+    private func approvalPage(now: Date) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let r = state.approval {
+                header {
+                    Text(now < r.expires ? "\(relative(r.expires.timeIntervalSince1970, now: now)) left" : "answer in terminal")
+                }
+                HStack(spacing: 6) {
+                    Image(systemName: r.isPlan ? "list.bullet.clipboard" : "exclamationmark.shield.fill").foregroundStyle(.orange)
+                    Text(r.isPlan ? "Plan ready for review" : "\(r.tool) needs permission").font(.caption).bold()
+                }
+                if let plan = r.plan {
+                    ScrollView {
+                        Text((try? AttributedString(markdown: plan, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace))) ?? AttributedString(plan))
+                            .font(.caption2).foregroundStyle(.secondary).textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .frame(maxHeight: .infinity)
+                } else if !r.detail.isEmpty {
+                    Text(r.detail).font(.system(.caption2, design: .monospaced)).foregroundStyle(.secondary).lineLimit(3).truncationMode(.middle)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                if now < r.expires {
+                    HStack(spacing: 6) {
+                        if r.isPlan {
+                            NavButton(icon: "checkmark", label: "Auto-accept edits", tint: .green) { answer(r, "allow acceptEdits") }
+                            NavButton(icon: "checkmark", label: "Ask on edits", tint: .green) { answer(r, "allow default") }
+                            NavButton(icon: "xmark", label: "Keep planning", tint: .red) { answer(r, "deny") }
+                        } else {
+                            NavButton(icon: "checkmark", label: "Allow", tint: .green) { answer(r, "allow") }
+                            NavButton(icon: "xmark", label: "Deny", tint: .red) { answer(r, "deny") }
+                        }
+                    }
+                }
             } else {
-                Image(systemName: "terminal").font(.caption).foregroundStyle(.gray)
+                Text("Nothing pending").font(.caption).foregroundStyle(.secondary)
             }
         }
-        .padding(8)
-        .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
+        .padding(.horizontal, 22)
+        .padding(.bottom, 14)
+        .foregroundStyle(.white)
+        .transition(.opacity)
     }
 
     // MARK: tab bar + caffeinate
@@ -301,7 +327,6 @@ struct NotchView: View {
                 NavButton(icon: "arrow.clockwise", spinning: state.refreshing, action: refresh)
                 NavButton(icon: state.pinned ? "pin.fill" : "pin", action: togglePin)
             }
-            if let r = state.approval { approvalBanner(r, now: now) }
             if ringGauges {
                 HStack(spacing: 0) {
                     ring("Session", snap.sessionUsedPct, resets: snap.sessionResetsAt, now: now, stale: stale)

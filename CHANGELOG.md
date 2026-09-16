@@ -4,6 +4,14 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+### Added
+- Plans can be approved from the notch: hover the "Plan ready" island to read the plan and choose Auto-accept edits / Ask on edits / Keep planning (90 s window before the terminal takes over).
+- Approval page shows the full command for tool prompts.
+
+### Changed
+- Swipe switches between tabs (Claude ↔ Caffeinate); header pills move between a tab's pages.
+- Header cup toggle removed; the Caffeinate tab owns it.
+
 ## [0.4.0] — 2026-09-16
 
 ### Added

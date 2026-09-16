@@ -34,10 +34,11 @@ struct NotchGeometry {
         return CGSize(width: hasNotch ? notchWidth + 2 * wing : island ? 2 * Self.islandWing : Self.pillWidth, height: topHeight)
     }
 
-    /// `tall`: overview has the per-model row. `banner`: overview shows a pending approval.
-    func expandedSize(for page: Page = .overview, tall: Bool = false, banner: Bool = false) -> CGSize {
+    /// `tall`: overview has the per-model row. `plan`: approval page shows a plan (needs reading room).
+    func expandedSize(for page: Page = .overview, tall: Bool = false, plan: Bool = false) -> CGSize {
         let card = switch page {
-        case .overview: CGSize(width: Self.expandedSize.width, height: Self.expandedSize.height + 24 + (tall ? 18 : 0) + (banner ? 50 : 0))
+        case .overview: CGSize(width: Self.expandedSize.width, height: Self.expandedSize.height + 24 + (tall ? 18 : 0))
+        case .approval: CGSize(width: Self.expandedSize.width, height: plan ? 300 : 120)
         case .trends: CGSize(width: 380, height: 280)
         case .week: CGSize(width: 380, height: 240)
         case .caffeine: CGSize(width: Self.expandedSize.width, height: 90)

@@ -48,11 +48,11 @@ Pro and Max limits are shared across Claude Code, claude.ai chat and Cowork, so 
 | **Claude · Week** | Per-day bars of weekly limit consumed, sessions started, peak session %, limit hits, CLI cost for the week |
 | **Caffeinate** | Keep the Mac awake for 30m / 1h / 2h / until turned off; auto-off when the timer ends; cup shows in the badge while awake |
 
-The icon bar at the bottom switches categories; pills in the header (or a two-finger swipe) move between a category's pages.
+The icon bar under the notch (or a two-finger swipe) switches categories; pills in the header move between a category's pages.
 
 ### Agent approvals
 
-When Claude Code stops for a permission, the badge turns into an **Allow / Deny island** and your answer goes straight back through the `PermissionRequest` hook. Answer within 15 s on the notch; otherwise the usual terminal prompt appears and the island clears itself once you answer there. When Claude presents a plan you get a "Plan ready for review" notification. Both are wired by **Connect Claude Code status line…** (adds `hooks` entries next to `statusLine` in `~/.claude/settings.json`).
+When Claude Code stops for a permission, the badge turns into an **Allow / Deny island** and your answer goes straight back through the `PermissionRequest` hook. Hover for the full command. When Claude presents a plan, hover to read it and pick the same options the terminal offers: **Auto-accept edits**, **Ask on edits** or **Keep planning**. Tool prompts wait 15 s on the notch, plans 90 s; after that the usual terminal prompt appears and the island clears itself once you answer there. Wired by **Connect Claude Code status line…** (adds `hooks` entries next to `statusLine` in `~/.claude/settings.json`).
 
 Badge colors: green under 60 %, yellow 60–85 %, red above. Greyed out ("offline") when no update arrives for 2 h. Notifications fire when session or weekly usage crosses 85 % and 100 %.
 
@@ -133,7 +133,7 @@ Menu bar gauge icon → **Settings…**
 | Warn at / Alert at | 85 % / 100 % | Notification thresholds per bucket |
 | Pace warning | on | Once per session window when the burn rate reaches 100 % before reset |
 | Allow/Deny island | on | Permission prompts appear on the notch for 15 s before the terminal takes over |
-| Plan ready notification | on | Fires when Claude Code presents a plan for approval |
+| Plans on the notch | on | Notification + approve/keep-planning from the card when Claude Code presents a plan |
 
 ## Privacy
 

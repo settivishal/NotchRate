@@ -97,8 +97,8 @@ struct SettingsView: View {
             }
             Section("Claude Code") {
                 Toggle("Allow/Deny island for permission prompts", isOn: $approvals)
-                Text("Answer on the notch within \(Int(Approvals.wait))s, or in the terminal as usual.").font(.caption).foregroundStyle(.secondary)
-                Toggle("Notify when a plan is ready for review", isOn: $planNotify)
+                Text("Tool prompts wait \(Int(Approvals.wait))s on the notch, plans \(Int(Approvals.planWait))s; then the terminal prompt takes over.").font(.caption).foregroundStyle(.secondary)
+                Toggle("Plans: notify and approve from the notch", isOn: $planNotify)
             }
         }
         .formStyle(.grouped)

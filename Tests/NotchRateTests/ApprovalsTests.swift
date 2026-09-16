@@ -12,6 +12,7 @@ import Testing
     #expect(r.id == "123" && r.tool == "Bash" && r.detail == "rm -rf build" && !r.isPlan)
     #expect(r.expires.timeIntervalSinceNow > 10)
     let plan = dir.appending(path: "plan-9.raw")
-    try #"{"tool_name":"ExitPlanMode","tool_input":{}}"#.write(to: plan, atomically: true, encoding: .utf8)
-    #expect(Approvals.parse(plan)?.isPlan == true)
+    try ##"{"tool_name":"ExitPlanMode","tool_input":{"plan":"# Title\n- step"}}"##.write(to: plan, atomically: true, encoding: .utf8)
+    let p = try #require(Approvals.parse(plan))
+    #expect(p.isPlan && p.plan == "# Title\n- step" && p.expires.timeIntervalSinceNow > 60)
 }
