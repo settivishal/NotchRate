@@ -4,6 +4,8 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-09-16
+
 ### Added
 - Agent approvals: Claude Code permission prompts show as an Allow/Deny island on the notch, answered through the `PermissionRequest` hook; terminal prompt takes over after 15 s.
 - "Plan ready for review" notification when Claude Code presents a plan.
