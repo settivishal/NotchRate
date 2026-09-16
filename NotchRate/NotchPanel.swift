@@ -14,15 +14,30 @@ final class NotchPanel: NSPanel {
         collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
     }
 
-    /// Two-finger horizontal swipe; +1 = next page, -1 = previous. One call per gesture.
-    var onSwipe: ((Int) -> Void)?
+    /// Two-finger horizontal swipe over the panel; +1 = next tab, -1 = previous. One call per gesture.
+    /// Local monitor rather than a scrollWheel override: the hosting view swallows scroll events.
+    var onSwipe: ((Int) -> Void)? {
+        didSet {
+            if let m = monitor { NSEvent.removeMonitor(m); monitor = nil }
+            guard onSwipe != nil else { return }
+            monitor = NSEvent.addLocalMonitorForEvents(matching: .scrollWheel) { [weak self] event in
+                self?.swipe(event)
+                return event
+            }
+        }
+    }
+    private var monitor: Any?
     private var swiped = false
+    private var accumulated: CGFloat = 0
 
-    override func scrollWheel(with event: NSEvent) {
-        if event.phase == .began { swiped = false }
-        guard !swiped, event.momentumPhase == [], abs(event.scrollingDeltaX) > 20, abs(event.scrollingDeltaX) > abs(event.scrollingDeltaY) else { return }
+    private func swipe(_ event: NSEvent) {
+        guard event.window === self else { return }
+        if event.phase == .began { swiped = false; accumulated = 0 }
+        guard !swiped, event.momentumPhase == [] else { return }
+        accumulated += event.scrollingDeltaX
+        guard abs(accumulated) > 30, abs(accumulated) > abs(event.scrollingDeltaY) else { return }
         swiped = true
-        onSwipe?(event.scrollingDeltaX < 0 ? 1 : -1)
+        onSwipe?(accumulated < 0 ? 1 : -1)
     }
 
     override var canBecomeKey: Bool { false }
