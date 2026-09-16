@@ -300,7 +300,6 @@ struct NotchView: View {
                      : now.timeIntervalSince1970 - snap.lastUpdated < 2 * max(30, pollSeconds) ? "live" : "updated \(relative(snap.lastUpdated, now: now)) ago")
                 NavButton(icon: "arrow.clockwise", spinning: state.refreshing, action: refresh)
                 NavButton(icon: state.pinned ? "pin.fill" : "pin", action: togglePin)
-                NavButton(icon: state.caffeinated ? "cup.and.saucer.fill" : "cup.and.saucer", tint: state.caffeinated ? .orange : nil) { state.caffeineUntil = state.caffeinated ? nil : .distantFuture }
             }
             if let r = state.approval { approvalBanner(r, now: now) }
             if ringGauges {
