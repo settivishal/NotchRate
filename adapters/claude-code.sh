@@ -5,7 +5,8 @@
 #   permission  PermissionRequest: publish the request to pending/, wait up to
 #               NOTCH_APPROVAL_WAIT seconds (NOTCH_PLAN_WAIT for ExitPlanMode) for the app to
 #               write an answer, print the decision. Answer grammar: "allow", "allow <mode>"
-#               (setMode for the session, e.g. acceptEdits), "deny".
+#               (setMode for the session, e.g. acceptEdits), "deny", or a full JSON decision
+#               starting with "{" (the app builds it when updatedInput must be echoed back).
 #               No answer in time -> exit silently so the terminal prompt shows as usual.
 #   clear       Any later hook: drop this session's pending request (the user answered in the terminal).
 set -u
@@ -43,6 +44,7 @@ case "${1:-}" in
     [ -f "$OUT_DIR/answer/$id" ] || exit 0
     read -r verb mode < "$OUT_DIR/answer/$id"
     case "$verb" in
+      \{*) cat "$OUT_DIR/answer/$id" ;;
       allow)
         if [ -n "${mode:-}" ]; then
           printf '{"hookSpecificOutput":{"hookEventName":"PermissionRequest","decision":{"behavior":"allow","updatedPermissions":[{"type":"setMode","mode":"%s","destination":"session"}]}}}' "$mode"

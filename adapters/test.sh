@@ -41,6 +41,12 @@ out=$(printf '%s' "$plan" | ./claude-code.sh permission)
 wait
 [[ "$out" == *'"behavior":"deny"'*'keep planning'* ]] || { echo "FAIL plan deny: $out"; exit 1; }
 
+# Full JSON answer is passed through verbatim.
+( sleep 0.5; printf '%s' '{"hookSpecificOutput":{"x":1}}' > "$NOTCH_USAGE_DIR/answer/plan-s1" ) &
+out=$(printf '%s' "$plan" | ./claude-code.sh permission)
+wait
+[ "$out" = '{"hookSpecificOutput":{"x":1}}' ] || { echo "FAIL json passthrough: $out"; exit 1; }
+
 # clear only touches its own session.
 printf '%s' "$plan" > "$NOTCH_USAGE_DIR/pending/plan-s1.raw"
 printf '%s' '{"session_id":"s2"}' | ./claude-code.sh clear

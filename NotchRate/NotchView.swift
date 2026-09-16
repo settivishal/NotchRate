@@ -80,6 +80,8 @@ struct NotchView: View {
     @AppStorage(Pref.cardRadius) private var cardRadius = 28.0
     @AppStorage(Pref.badgeCountdown) private var badgeCountdown = false
     @AppStorage(Pref.badgeRing) private var badgeRing = false
+    @AppStorage(Pref.glass) private var glassPref = true
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hoverTask: Task<Void, Never>?
     @State private var dropTargeted = false
@@ -94,10 +96,17 @@ struct NotchView: View {
                                   : geo.collapsedSize(island: state.approval != nil, blob: state.caffeinated)
         TimelineView(.periodic(from: .now, by: state.approval == nil && !(state.expanded && state.page == .caffeine) ? 60 : 1)) { ctx in
             let blob = !state.expanded && state.caffeinated
+            let shape = NotchShape(topRadius: geo.hasNotch ? 6 : 0, bottomRadius: state.expanded ? cardRadius : 12)
+            let glass = state.expanded && glassPref && !reduceTransparency
             ZStack(alignment: .top) {
-                NotchShape(topRadius: geo.hasNotch ? 6 : 0, bottomRadius: state.expanded ? cardRadius : 12)
-                    .fill(.black)
-                    .padding(.horizontal, blob ? geo.blobWidth + NotchGeometry.blobGap : 0)  // leave room for the side blob
+                if glass {
+                    // Dark-tinted glass card; the notch band stays solid so it merges with the hardware.
+                    shape.fill(.clear).glassEffect(.regular.tint(.black.opacity(0.6)), in: shape)
+                    shape.fill(.black).mask(alignment: .top) { Rectangle().frame(height: geo.topHeight + 1) }
+                } else {
+                    shape.fill(.black)
+                        .padding(.horizontal, blob ? geo.blobWidth + NotchGeometry.blobGap : 0)  // leave room for the side blob
+                }
                 if blob {
                     caffeineBlob(now: ctx.date)
                         .frame(maxWidth: .infinity, alignment: .trailing)
@@ -252,7 +261,7 @@ struct NotchView: View {
     // MARK: tab bar + caffeinate
 
     private var tabBar: some View {
-        HStack(spacing: 8) {
+        GlassEffectContainer(spacing: 8) { HStack(spacing: 8) {
             ForEach(Tab.allCases, id: \.self) { t in
                 let awake = t == .caffeine && state.caffeinated  // glows on every tab so the state is visible from Claude too
                 let count = t == .shelf ? shelf.items.count : 0
@@ -265,7 +274,7 @@ struct NotchView: View {
                         }
                     }
             }
-        }
+        } }
         .padding(.top, 6)
         .padding(.bottom, 4)
     }
@@ -679,6 +688,8 @@ struct NavButton: View {
     var tint: Color? = nil  // resting color; default gray
     let action: () -> Void
     @State private var hovered = false
+    @AppStorage(Pref.glass) private var glassPref = true
+    @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     var body: some View {
         HStack(spacing: 4) {
@@ -693,7 +704,8 @@ struct NavButton: View {
         .foregroundStyle(hovered ? .white : tint ?? .gray)
         .padding(.horizontal, label == nil ? 0 : large ? 14 : 9)
         .frame(width: label == nil ? 24 : nil, height: large ? 32 : 24)
-        .background((tint ?? .white).opacity(hovered ? 0.3 : 0.1), in: Capsule())
+        .background { if !(glassPref && !reduceTransparency) { Capsule().fill((tint ?? .white).opacity(hovered ? 0.3 : 0.1)) } }
+        .glassEffect(glassPref && !reduceTransparency ? .regular.interactive().tint((tint ?? .white).opacity(hovered ? 0.35 : 0.12)) : .identity, in: Capsule())
         .scaleEffect(hovered ? 1.08 : 1)
         .contentShape(Capsule())
         .onTapGesture(perform: action)

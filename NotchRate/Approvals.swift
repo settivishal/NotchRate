@@ -13,6 +13,7 @@ final class Approvals {
         let expires: Date     // hook gives up and the terminal prompt takes over
         let isPlan: Bool
         let plan: String?     // ExitPlanMode markdown
+        let input: Data       // raw tool_input JSON; ExitPlanMode must get it echoed back as updatedInput
     }
 
     // Keep in sync with NOTCH_APPROVAL_WAIT / NOTCH_PLAN_WAIT defaults in the adapter.
@@ -50,10 +51,13 @@ final class Approvals {
     }
 
     /// `decision`: "allow", "allow <mode>" (session setMode, e.g. acceptEdits) or "deny".
+    /// Plans need `updatedInput` alongside allow (Claude Code requires it for ExitPlanMode), so the
+    /// full decision JSON is written and the adapter passes it through.
     func answer(_ r: Request, _ decision: String) {
         let dir = directory.deletingLastPathComponent().appending(path: "answer")
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        try? decision.write(to: dir.appending(path: r.id), atomically: true, encoding: .utf8)
+        let out = r.isPlan && decision.hasPrefix("allow") ? Self.planDecision(input: r.input, mode: decision.split(separator: " ").dropFirst().first.map(String.init)) : decision
+        try? out.write(to: dir.appending(path: r.id), atomically: true, encoding: .utf8)
         pending.removeAll { $0.id == r.id }  // hook deletes the file; do not wait for the watcher
         onChange?()
     }
@@ -67,6 +71,13 @@ final class Approvals {
         onChange?()
     }
 
+    nonisolated static func planDecision(input: Data, mode: String?) -> String {
+        var d: [String: Any] = ["behavior": "allow", "updatedInput": (try? JSONSerialization.jsonObject(with: input)) ?? [:]]
+        if let mode { d["updatedPermissions"] = [["type": "setMode", "mode": mode, "destination": "session"]] }
+        let obj = ["hookSpecificOutput": ["hookEventName": "PermissionRequest", "decision": d]]
+        return String(decoding: (try? JSONSerialization.data(withJSONObject: obj)) ?? Data(), as: UTF8.self)
+    }
+
     nonisolated static func parse(_ url: URL) -> Request? {
         guard let data = try? Data(contentsOf: url), let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
         let input = json["tool_input"] as? [String: Any] ?? [:]
@@ -74,6 +85,7 @@ final class Approvals {
         let id = url.deletingPathExtension().lastPathComponent, isPlan = id.hasPrefix("plan-")
         return Request(id: id, tool: json["tool_name"] as? String ?? "?",
                        detail: (["command", "file_path", "description", "url", "prompt"].lazy.compactMap { input[$0] as? String }.first ?? "").prefix(300).description,
-                       expires: mtime.addingTimeInterval(isPlan ? planWait : wait), isPlan: isPlan, plan: input["plan"] as? String)
+                       expires: mtime.addingTimeInterval(isPlan ? planWait : wait), isPlan: isPlan, plan: input["plan"] as? String,
+                       input: (try? JSONSerialization.data(withJSONObject: input)) ?? Data("{}".utf8))
     }
 }

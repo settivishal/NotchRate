@@ -15,4 +15,9 @@ import Testing
     try ##"{"tool_name":"ExitPlanMode","tool_input":{"plan":"# Title\n- step"}}"##.write(to: plan, atomically: true, encoding: .utf8)
     let p = try #require(Approvals.parse(plan))
     #expect(p.isPlan && p.plan == "# Title\n- step" && p.expires.timeIntervalSinceNow > 60)
+    let out = try #require(JSONSerialization.jsonObject(with: Data(Approvals.planDecision(input: p.input, mode: "acceptEdits").utf8)) as? [String: Any])
+    let d = (out["hookSpecificOutput"] as? [String: Any])?["decision"] as? [String: Any]
+    #expect(d?["behavior"] as? String == "allow")
+    #expect((d?["updatedInput"] as? [String: Any])?["plan"] as? String == "# Title\n- step")
+    #expect(((d?["updatedPermissions"] as? [[String: Any]])?.first?["mode"] as? String) == "acceptEdits")
 }
