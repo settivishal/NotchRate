@@ -24,7 +24,7 @@
 
 ---
 
-**NotchRate** is a native macOS app that shows how much of your Claude **session (5h)** and **weekly (7d)** limits you have used, right beside the MacBook notch. Glance at it; hover for detail. Near-zero idle CPU, no Electron.
+**NotchRate** is a native macOS utility that lives in the MacBook notch. Its first module shows how much of your Claude **session (5h)** and **weekly (7d)** limits you have used; hover for detail, swipe or tap between categories for more tools (Caffeinate, Claude Code approvals). Near-zero idle CPU, no Electron.
 
 Pro and Max limits are shared across Claude Code, claude.ai chat and Cowork, so the badge reflects all of them — not just the terminal.
 
@@ -41,14 +41,14 @@ Pro and Max limits are shared across Claude Code, claude.ai chat and Cowork, so 
   <img src="docs/screenshot-week.png" alt="This week page" width="300">
 </p>
 
-| Page | What it shows |
+| Tab · Page | What it shows |
 |---|---|
-| **Overview** | Session and weekly ring gauges (or bars) with reset countdowns, CLI cost, context window %, extra-usage % when enabled, refresh, pin, link to claude.ai usage |
-| **Trends** | 5h and 7d charts, burn rate, "full in ~Xh", usage this window, today's / average daily usage, projected weekly at reset |
-| **This week** | Per-day bars of weekly limit consumed, sessions started, peak session %, limit hits, CLI cost for the week |
-| **Controls** | Keep Mac awake (caffeinate) toggle |
+| **Claude · Overview** | Session and weekly ring gauges (or bars) with reset countdowns, CLI cost, context window %, extra-usage % when enabled, refresh, pin, link to claude.ai usage |
+| **Claude · Trends** | 5h and 7d charts, burn rate, "full in ~Xh", usage this window, today's / average daily usage, projected weekly at reset |
+| **Claude · Week** | Per-day bars of weekly limit consumed, sessions started, peak session %, limit hits, CLI cost for the week |
+| **Caffeinate** | Keep the Mac awake for 30m / 1h / 2h / until turned off; auto-off when the timer ends; cup shows in the badge while awake |
 
-Switch pages with the icon bar at the bottom of the card or a two-finger horizontal swipe.
+The icon bar at the bottom switches categories; pills in the header (or a two-finger swipe) move between a category's pages.
 
 ### Agent approvals
 

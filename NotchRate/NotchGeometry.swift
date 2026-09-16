@@ -4,7 +4,7 @@ import AppKit
 /// shape merges with it. No notch: a small pill hugging the menu bar.
 struct NotchGeometry {
     static var pillWidth: CGFloat { UserDefaults.standard.bool(forKey: Pref.showWeekly) ? 160 : 130 }
-    static var expandedSize: CGSize { CGSize(width: 340, height: UserDefaults.standard.bool(forKey: Pref.ringGauges) ? 122 : 150) }
+    static var expandedSize: CGSize { CGSize(width: 380, height: UserDefaults.standard.bool(forKey: Pref.ringGauges) ? 122 : 150) }
 
     let screen: NSScreen
     let hasNotch: Bool
@@ -25,7 +25,7 @@ struct NotchGeometry {
     }
 
     static let islandWing: CGFloat = 96  // wider wings while an approval request is showing
-    static let tabBar: CGFloat = 18
+    static let tabBar: CGFloat = 34
 
     var collapsedSize: CGSize { collapsedSize(island: false) }
 
@@ -40,7 +40,7 @@ struct NotchGeometry {
         case .overview: CGSize(width: Self.expandedSize.width, height: Self.expandedSize.height + 24 + (tall ? 18 : 0) + (banner ? 50 : 0))
         case .trends: CGSize(width: 380, height: 280)
         case .week: CGSize(width: 380, height: 240)
-        case .controls: CGSize(width: Self.expandedSize.width, height: 90)
+        case .caffeine: CGSize(width: Self.expandedSize.width, height: 90)
         }
         return CGSize(width: max(card.width, collapsedSize(island: true).width), height: topHeight + card.height + Self.tabBar)
     }

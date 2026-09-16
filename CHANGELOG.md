@@ -7,8 +7,8 @@ All notable changes to this project are documented here. Format follows [Keep a 
 ### Added
 - Agent approvals: Claude Code permission prompts show as an Allow/Deny island on the notch, answered through the `PermissionRequest` hook; terminal prompt takes over after 15 s.
 - "Plan ready for review" notification when Claude Code presents a plan.
-- Controls page with a Keep Mac awake (caffeinate) toggle, also in the menu bar menu.
-- Icon tab bar and two-finger swipe to switch card pages.
+- Card organised into categories: Claude (Overview / Trends / Week pills) and Caffeinate (30m / 1h / 2h / ∞ presets with auto-off, cup indicator in the badge).
+- Icon tab bar switches categories; two-finger swipe moves between a category's pages.
 
 ### Changed
 - Connect Claude Code status line… now also installs the hook entries; existing installs are upgraded on launch.

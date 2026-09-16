@@ -124,9 +124,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func swipe(_ dir: Int) {
-        guard state.expanded, let i = Page.allCases.firstIndex(of: state.page) else { return }
-        let n = min(max(i + dir, 0), Page.allCases.count - 1)
-        if n != i { setPage(Page.allCases[n]) }
+        let pages = state.page.tab.pages
+        guard state.expanded, let i = pages.firstIndex(of: state.page) else { return }
+        let n = min(max(i + dir, 0), pages.count - 1)
+        if n != i { setPage(pages[n]) }
     }
 
     private func expandedSize(for page: Page) -> CGSize {

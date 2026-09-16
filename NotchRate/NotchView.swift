@@ -1,14 +1,27 @@
 import Charts
 import SwiftUI
 
-enum Page: CaseIterable {
-    case overview, trends, week, controls
+/// Bottom bar categories. Each owns one or more pages; swipe moves within a tab.
+enum Tab: CaseIterable {
+    case claude, caffeine
     var icon: String {
         switch self {
-        case .overview: "gauge.with.dots.needle.33percent"
-        case .trends: "chart.xyaxis.line"
-        case .week: "calendar"
-        case .controls: "slider.horizontal.3"
+        case .claude: "gauge.with.dots.needle.33percent"
+        case .caffeine: "cup.and.saucer.fill"
+        }
+    }
+    var pages: [Page] { Page.allCases.filter { $0.tab == self } }
+}
+
+enum Page: CaseIterable {
+    case overview, trends, week, caffeine
+    var tab: Tab { self == .caffeine ? .caffeine : .claude }
+    var title: String {
+        switch self {
+        case .overview: "Overview"
+        case .trends: "Trends"
+        case .week: "Week"
+        case .caffeine: "Caffeinate"
         }
     }
 }
@@ -23,7 +36,21 @@ final class NotchState {
     var pinned = false
     var tallCard = false  // overview shows a per-model row
     var approval: Approvals.Request?  // collapsed badge becomes an Allow/Deny island while set
-    var caffeinated = false { didSet { Caffeine.on = caffeinated } }
+    /// nil = off, .distantFuture = until turned off, else auto-off at that time.
+    var caffeineUntil: Date? {
+        didSet {
+            Caffeine.on = caffeinated
+            caffeineTimer?.cancel()
+            guard let until = caffeineUntil, until != .distantFuture else { return }
+            caffeineTimer = Task { [weak self] in
+                try? await Task.sleep(until: .now + .seconds(until.timeIntervalSinceNow))
+                guard !Task.isCancelled else { return }
+                self?.caffeineUntil = nil
+            }
+        }
+    }
+    var caffeinated: Bool { caffeineUntil != nil }
+    private var caffeineTimer: Task<Void, Never>?
     init(geometry: NotchGeometry) { self.geometry = geometry }
 }
 
@@ -62,13 +89,16 @@ struct NotchView: View {
                 if state.expanded, let snap = store.primary {
                     let level = snap.level(now: ctx.date, staleAfter: staleHours * 3600)
                     VStack(spacing: 0) {
+                        // Tab bar sits right under the notch: the card resizes from the bottom, so the
+                        // cursor stays inside while switching pages (a bottom bar slid out from under it).
+                        Color.clear.frame(height: geo.topHeight)
+                        tabBar
                         switch state.page {
                         case .overview: expanded(snap, level: level, now: ctx.date)
                         case .trends: trends(snap, now: ctx.date)
                         case .week: week(snap, now: ctx.date)
-                        case .controls: controls
+                        case .caffeine: caffeinePage(now: ctx.date)
                         }
-                        tabBar
                     }
                 } else if let r = state.approval {
                     island(r, now: ctx.date)
@@ -156,28 +186,40 @@ struct NotchView: View {
         .background(.white.opacity(0.08), in: RoundedRectangle(cornerRadius: 10))
     }
 
-    // MARK: tab bar + controls
+    // MARK: tab bar + caffeinate
 
     private var tabBar: some View {
-        HStack(spacing: 10) {
-            ForEach(Page.allCases, id: \.self) { p in
-                NavButton(icon: p.icon, tint: state.page == p ? .white : nil) { setPage(p) }
+        HStack(spacing: 8) {
+            ForEach(Tab.allCases, id: \.self) { t in
+                NavButton(icon: t.icon, tint: state.page.tab == t ? (t == .caffeine && state.caffeinated ? .orange : .white) : nil) { setPage(t.pages[0]) }
             }
         }
-        .padding(.bottom, 10)
+        .padding(.top, 6)
+        .padding(.bottom, 4)
     }
 
-    private var controls: some View {
+    private static let presets: [(String, TimeInterval)] = [("30m", 1800), ("1h", 3600), ("2h", 7200), ("∞", .infinity)]
+
+    private func caffeinePage(now: Date) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Color.clear.frame(height: state.geometry.topHeight)
-            header("Controls") { EmptyView() }
-            Toggle(isOn: Binding(get: { state.caffeinated }, set: { state.caffeinated = $0 })) {
-                Label("Keep Mac awake", systemImage: "cup.and.saucer.fill").font(.caption)
+            header {
+                if let until = state.caffeineUntil {
+                    Text(until == .distantFuture ? "awake until turned off" : "awake · \(relative(until.timeIntervalSince1970, now: now)) left")
+                } else {
+                    Text("sleeping normally")
+                }
             }
-            .toggleStyle(.switch).controlSize(.small).tint(.orange)
+            HStack(spacing: 6) {
+                NavButton(icon: "moon", label: "Off", tint: state.caffeinated ? nil : .white) { state.caffeineUntil = nil }
+                ForEach(Self.presets, id: \.0) { name, secs in
+                    let target: Date = secs.isInfinite ? .distantFuture : now.addingTimeInterval(secs)
+                    let selected = state.caffeineUntil.map { secs.isInfinite ? $0 == .distantFuture : abs($0.timeIntervalSince(target)) < 60 } ?? false
+                    NavButton(icon: "cup.and.saucer.fill", label: name, tint: selected ? .orange : nil) { state.caffeineUntil = target }
+                }
+            }
         }
         .padding(.horizontal, 22)
-        .padding(.bottom, 4)
+        .padding(.bottom, 14)
         .foregroundStyle(.white)
         .transition(.opacity)
     }
@@ -195,17 +237,20 @@ struct NotchView: View {
                 if showWeekly {
                     bucket("5h", snap.sessionUsedPct, resets: snap.sessionResetsAt, level: session, now: now).padding(.leading, geo.hasNotch ? 14 : 0)
                 } else {
-                    if badgeRing {
-                        ZStack {
-                            Circle().stroke(.white.opacity(0.2), lineWidth: 2)
-                            Circle().trim(from: 0, to: min(snap.sessionUsedPct ?? 0, 100) / 100)
-                                .stroke(session.color, style: StrokeStyle(lineWidth: 2, lineCap: .round)).rotationEffect(.degrees(-90))
+                    // Group is transparent to the HStack: the wing frame applies per child, so keep the dot and cup in one HStack.
+                    HStack(spacing: 5) {
+                        if badgeRing {
+                            ZStack {
+                                Circle().stroke(.white.opacity(0.2), lineWidth: 2)
+                                Circle().trim(from: 0, to: min(snap.sessionUsedPct ?? 0, 100) / 100)
+                                    .stroke(session.color, style: StrokeStyle(lineWidth: 2, lineCap: .round)).rotationEffect(.degrees(-90))
+                            }
+                            .frame(width: 10, height: 10)
+                        } else {
+                            Circle().fill(session.color).frame(width: 8, height: 8)
                         }
-                        .frame(width: 10, height: 10)
-                    } else {
-                        Circle().fill(session.color).frame(width: 8, height: 8)
+                        if state.caffeinated { Image(systemName: "cup.and.saucer.fill").resizable().scaledToFit().frame(width: 10, height: 10).foregroundStyle(.orange) }
                     }
-                    if state.caffeinated { Image(systemName: "cup.and.saucer.fill").font(.system(size: 9)).foregroundStyle(.orange).padding(.leading, 5) }
                 }
             }
             .frame(width: geo.hasNotch ? geo.wingWidth : 30)
@@ -250,13 +295,12 @@ struct NotchView: View {
     private func expanded(_ snap: UsageSnapshot, level: Level, now: Date) -> some View {
         let stale = level == .stale
         return VStack(alignment: .leading, spacing: 10) {
-            Color.clear.frame(height: state.geometry.topHeight)  // physical notch region
-            header("Claude") {
+            header {
                 Text(stale ? "offline · \(relative(snap.lastUpdated, now: now)) ago"
                      : now.timeIntervalSince1970 - snap.lastUpdated < 2 * max(30, pollSeconds) ? "live" : "updated \(relative(snap.lastUpdated, now: now)) ago")
                 NavButton(icon: "arrow.clockwise", spinning: state.refreshing, action: refresh)
                 NavButton(icon: state.pinned ? "pin.fill" : "pin", action: togglePin)
-                NavButton(icon: state.caffeinated ? "cup.and.saucer.fill" : "cup.and.saucer", tint: state.caffeinated ? .orange : nil) { state.caffeinated.toggle() }
+                NavButton(icon: state.caffeinated ? "cup.and.saucer.fill" : "cup.and.saucer", tint: state.caffeinated ? .orange : nil) { state.caffeineUntil = state.caffeinated ? nil : .distantFuture }
             }
             if let r = state.approval { approvalBanner(r, now: now) }
             if ringGauges {
@@ -295,16 +339,23 @@ struct NotchView: View {
             .font(.caption).foregroundStyle(.secondary)
         }
         .padding(.horizontal, 22)
-        .padding(.bottom, 4)
+        .padding(.bottom, 14)
         .foregroundStyle(.white)
         .opacity(stale ? 0.6 : 1)
         .transition(.opacity)
     }
 
-    /// Title row; page switching lives in the tab bar and swipe.
-    private func header<Trailing: View>(_ title: String, @ViewBuilder trailing: () -> Trailing) -> some View {
-        HStack(spacing: 6) {
-            Text(title).font(.headline)
+    /// Title row: sub-page pills when the tab has several pages, else the page title.
+    private func header<Trailing: View>(@ViewBuilder trailing: () -> Trailing) -> some View {
+        let pages = state.page.tab.pages
+        return HStack(spacing: 6) {
+            if pages.count > 1 {
+                ForEach(pages, id: \.self) { p in
+                    NavButton(label: p.title, tint: state.page == p ? .white : nil) { setPage(p) }
+                }
+            } else {
+                Text(state.page.title).font(.headline)
+            }
             Spacer()
             trailing().font(.caption).foregroundStyle(.gray)
         }
@@ -320,8 +371,7 @@ struct NotchView: View {
         let stats = WeekStats(rows, weeklyResetsAt: snap.weeklyResetsAt, now: now)
         let inWindow = rows.filter { $0.ts >= now.timeIntervalSince1970 - 7 * 86400 }.count
         return VStack(alignment: .leading, spacing: 4) {
-            Color.clear.frame(height: state.geometry.topHeight)
-            header("Trends") { EmptyView() }
+            header { EmptyView() }
             label("Session", s, resets: snap.sessionResetsAt, now: now,
                   detail: sRate > 0 ? "\(Int(sRate.rounded()))%/h · full in ~\(hours((100 - s) / sRate)) · +\(Int(used.rounded()))% this window" : "idle · +\(Int(used.rounded()))% this window")
             chart(rows, \.s, hours: 5, pct: s, now: now)
@@ -334,7 +384,7 @@ struct NotchView: View {
             }
         }
         .padding(.horizontal, 22)
-        .padding(.bottom, 4)
+        .padding(.bottom, 14)
         .foregroundStyle(.white)
         .transition(.opacity)
     }
@@ -391,8 +441,7 @@ struct NotchView: View {
         let stats = WeekStats(History.load(now: now), weeklyResetsAt: snap.weeklyResetsAt, now: now)
         let today = Calendar.current.startOfDay(for: now)
         return VStack(alignment: .leading, spacing: 8) {
-            Color.clear.frame(height: state.geometry.topHeight)
-            header("This week") {
+            header {
                 if let r = snap.weeklyResetsAt { Text("resets \(resetText(r, now: now))") }
             }
             Chart(stats.daily, id: \.day) { d in
@@ -424,7 +473,7 @@ struct NotchView: View {
             .font(.caption).foregroundStyle(.secondary)
         }
         .padding(.horizontal, 22)
-        .padding(.bottom, 4)
+        .padding(.bottom, 14)
         .foregroundStyle(.white)
         .transition(.opacity)
     }
@@ -487,7 +536,7 @@ struct NotchView: View {
 
 /// Small pill that lights up and shows a hand cursor on hover; chevrons alone were easy to miss.
 struct NavButton: View {
-    let icon: String
+    var icon: String? = nil
     var label: String? = nil
     var spinning = false
     var tint: Color? = nil  // resting color; default gray
@@ -495,15 +544,18 @@ struct NavButton: View {
     @State private var hovered = false
 
     var body: some View {
-        HStack(spacing: 3) {
+        HStack(spacing: 4) {
             if let label { Text(label).font(.caption) }
-            Image(systemName: icon).font(.caption.bold())
-                .rotationEffect(.degrees(spinning ? 360 : 0))
-                .animation(spinning ? .linear(duration: 0.8).repeatForever(autoreverses: false) : .default, value: spinning)
+            if let icon {
+                Image(systemName: icon).resizable().scaledToFit().fontWeight(.bold)
+                    .frame(width: 11, height: 11)  // every glyph fills the same box
+                    .rotationEffect(.degrees(spinning ? 360 : 0))
+                    .animation(spinning ? .linear(duration: 0.8).repeatForever(autoreverses: false) : .default, value: spinning)
+            }
         }
         .foregroundStyle(hovered ? .white : tint ?? .gray)
-        .padding(.horizontal, label == nil ? 6 : 8)
-        .frame(height: 22)
+        .padding(.horizontal, label == nil ? 0 : 9)
+        .frame(width: label == nil ? 24 : nil, height: 24)
         .background((tint ?? .white).opacity(hovered ? 0.3 : 0.1), in: Capsule())
         .scaleEffect(hovered ? 1.08 : 1)
         .contentShape(Capsule())
