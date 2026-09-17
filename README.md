@@ -12,7 +12,7 @@
 </p>
 
 <p align="center">
-  <a href="#see-it">See it</a> ·
+  <a href="#what-you-get">What you get</a> ·
   <a href="#install">Install</a> ·
   <a href="#how-it-works">How it works</a> ·
   <a href="#settings">Settings</a> ·
@@ -28,18 +28,9 @@
 
 Pro and Max limits are shared across Claude Code, claude.ai chat and Cowork, so the badge reflects all of them — not just the terminal.
 
-## See it
+## What you get
 
-<p align="center">
-  <img src="docs/screenshot-badge.png" alt="Collapsed badge beside the notch" width="480"><br>
-  <sub>Collapsed: dot + session %, merged with the notch. On external displays, a pill at the top of the menu bar.</sub>
-</p>
-
-<p align="center">
-  <img src="docs/screenshot-overview.png" alt="Overview page" width="300">
-  <img src="docs/screenshot-trends.png" alt="Trends page" width="300">
-  <img src="docs/screenshot-week.png" alt="This week page" width="300">
-</p>
+Collapsed: dot + session %, merged with the notch (a pill at the top of the menu bar on external displays). Hover for the card:
 
 | Tab · Page | What it shows |
 |---|---|
