@@ -20,14 +20,13 @@ enum Pref {
     static let hotkey = "hotkey"               // Bool, default true: ⌃⌥N toggles the card
     static let planNotify = "planNotify"       // Bool, default true: notify when Claude Code presents a plan
     static let approvals = "approvals"         // Bool, default true: Allow/Deny island for permission prompts
-    static let glass = "glass"                 // Bool, default true: Liquid Glass expanded card (off under Reduce Transparency)
     static let paceWarnedFor = "paceWarnedFor" // Double: session resets_at already warned about
 
     static func register() {
         UserDefaults.standard.register(defaults: [
             staleHours: 2.0, hoverDelay: 0.3, allDisplays: true, wingWidth: 44.0, showWeekly: false, hideBadge: false,
             ringGauges: true, pollSeconds: 60.0, cardRadius: 28.0, badgeCountdown: false, badgeRing: false,
-            menuBarText: false, warnPct: 85.0, fullPct: 100.0, paceWarn: true, hotkey: true, planNotify: true, approvals: true, glass: true,
+            menuBarText: false, warnPct: 85.0, fullPct: 100.0, paceWarn: true, hotkey: true, planNotify: true, approvals: true,
         ])
     }
     static var staleAfter: TimeInterval { UserDefaults.standard.double(forKey: staleHours) * 3600 }
@@ -53,7 +52,6 @@ struct SettingsView: View {
     @AppStorage(Pref.hotkey) private var hotkey = true
     @AppStorage(Pref.planNotify) private var planNotify = true
     @AppStorage(Pref.approvals) private var approvals = true
-    @AppStorage(Pref.glass) private var glass = true
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -80,8 +78,6 @@ struct SettingsView: View {
                 Slider(value: $wingWidth, in: 30...120, step: 2) { Text("Badge width beside notch: \(Int(wingWidth))pt") }
             }
             Section("Card") {
-                Toggle("Liquid Glass card", isOn: $glass)
-                Text("Solid black when off or when Reduce Transparency is on.").font(.caption).foregroundStyle(.secondary)
                 Picker("Gauges", selection: $ringGauges) {
                     Text("Rings").tag(true)
                     Text("Bars").tag(false)
