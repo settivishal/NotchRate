@@ -4,8 +4,18 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-09-17
+
 ### Added
 - Caffeinate shows as a detached side blob with a countdown ring beside the badge (iOS-style); cup removed from the badge.
+- Named tab pills (Claude · Caffeinate) with a uniform 12pt layout rhythm.
+
+### Fixed
+- Plan approval from the notch now actually applies: `ExitPlanMode` needs `updatedInput` echoed with the allow decision.
+- Two-finger swipe and the arrow cursor work while another app is frontmost (global event monitor).
+- Expanded card was floored at the island+blob width; now 340pt on every page.
+- Caffeinate and Approval pages render before any usage data arrives; hover ignores the transparent strip beside the blob.
+- Snappier expand/collapse and button hover; default hover delay 0.15s.
 
 ## [0.5.0] — 2026-09-16
 
