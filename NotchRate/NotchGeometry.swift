@@ -4,7 +4,7 @@ import AppKit
 /// shape merges with it. No notch: a small pill hugging the menu bar.
 struct NotchGeometry {
     static var pillWidth: CGFloat { UserDefaults.standard.bool(forKey: Pref.showWeekly) ? 160 : 130 }
-    static var expandedSize: CGSize { CGSize(width: 380, height: UserDefaults.standard.bool(forKey: Pref.ringGauges) ? 122 : 150) }
+    static var expandedSize: CGSize { CGSize(width: 340, height: UserDefaults.standard.bool(forKey: Pref.ringGauges) ? 122 : 150) }
 
     let screen: NSScreen
     let hasNotch: Bool
@@ -44,11 +44,11 @@ struct NotchGeometry {
         let card = switch page {
         case .overview: CGSize(width: Self.expandedSize.width, height: Self.expandedSize.height + 24 + (tall ? 18 : 0))
         case .approval: CGSize(width: Self.expandedSize.width, height: plan ? 300 : 120)
-        case .trends: CGSize(width: 380, height: 280)
-        case .week: CGSize(width: 380, height: 240)
+        case .trends: CGSize(width: Self.expandedSize.width, height: 280)
+        case .week: CGSize(width: Self.expandedSize.width, height: 240)
         case .caffeine: CGSize(width: Self.expandedSize.width, height: Self.expandedSize.height + 24)  // same as overview
         }
-        return CGSize(width: max(card.width, collapsedSize(island: true, blob: true).width), height: topHeight + card.height + Self.tabBar)
+        return CGSize(width: max(card.width, collapsedSize.width), height: topHeight + card.height + Self.tabBar)
     }
 
     /// Top-center frame for a window of `size` on this screen.
