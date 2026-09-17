@@ -69,7 +69,7 @@ struct NotchView: View {
     var togglePin: () -> Void
     var answer: (Approvals.Request, String) -> Void  // "allow", "allow <mode>", "deny"
 
-    @AppStorage(Pref.hoverDelay) private var hoverDelay = 0.3
+    @AppStorage(Pref.hoverDelay) private var hoverDelay = 0.15
     @AppStorage(Pref.staleHours) private var staleHours = 2.0
     @AppStorage(Pref.showWeekly) private var showWeekly = false
     @AppStorage(Pref.ringGauges) private var ringGauges = true
@@ -81,7 +81,7 @@ struct NotchView: View {
     @State private var hoverTask: Task<Void, Never>?
 
     private var animation: Animation {
-        reduceMotion ? .easeOut(duration: 0.15) : .spring(response: 0.4, dampingFraction: 0.8)
+        reduceMotion ? .easeOut(duration: 0.12) : .spring(response: 0.26, dampingFraction: 0.86)
     }
 
     var body: some View {
@@ -646,12 +646,12 @@ struct NavButton: View {
         .padding(.horizontal, label == nil ? 0 : large ? 14 : 9)
         .frame(width: label == nil ? 24 : nil, height: large ? 32 : 24)
         .background((tint ?? .white).opacity(hovered ? 0.3 : 0.1), in: Capsule())
-        .scaleEffect(hovered ? 1.08 : 1)
+        .scaleEffect(hovered ? 1.06 : 1)
         .contentShape(Capsule())
         .onTapGesture(perform: action)
         .onHover { hovered = $0 }
         .pointerStyle(.default)  // solid arrow; push/pop of NSCursor was overridden in the non-key panel
-        .animation(.easeOut(duration: 0.12), value: hovered)
+        .animation(.easeOut(duration: 0.07), value: hovered)
     }
 }
 

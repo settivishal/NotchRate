@@ -152,7 +152,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             state.expanded = false
             state.page = .overview
             collapseTask = Task {
-                try? await Task.sleep(for: .milliseconds(450))
+                try? await Task.sleep(for: .milliseconds(300))  // just past the collapse spring
                 guard !Task.isCancelled, !state.expanded else { return }
                 panel.setFrame(collapsedFrame, display: true)
             }

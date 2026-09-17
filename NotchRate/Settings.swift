@@ -3,7 +3,7 @@ import SwiftUI
 
 enum Pref {
     static let staleHours = "staleHours"       // Double, default 2
-    static let hoverDelay = "hoverDelay"       // Double seconds, default 0.3
+    static let hoverDelay = "hoverDelay"       // Double seconds, default 0.15
     static let allDisplays = "allDisplays"     // Bool, default true
     static let wingWidth = "wingWidth"         // Double points, default 44
     static let showWeekly = "showWeekly"       // Bool, default false: collapsed badge shows 5h and 7d
@@ -24,7 +24,7 @@ enum Pref {
 
     static func register() {
         UserDefaults.standard.register(defaults: [
-            staleHours: 2.0, hoverDelay: 0.3, allDisplays: true, wingWidth: 44.0, showWeekly: false, hideBadge: false,
+            staleHours: 2.0, hoverDelay: 0.15, allDisplays: true, wingWidth: 44.0, showWeekly: false, hideBadge: false,
             ringGauges: true, pollSeconds: 60.0, cardRadius: 28.0, badgeCountdown: false, badgeRing: false,
             menuBarText: false, warnPct: 85.0, fullPct: 100.0, paceWarn: true, hotkey: true, planNotify: true, approvals: true,
         ])
@@ -35,7 +35,7 @@ enum Pref {
 
 struct SettingsView: View {
     @AppStorage(Pref.staleHours) private var staleHours = 2.0
-    @AppStorage(Pref.hoverDelay) private var hoverDelay = 0.3
+    @AppStorage(Pref.hoverDelay) private var hoverDelay = 0.15
     @AppStorage(Pref.allDisplays) private var allDisplays = true
     @AppStorage(Pref.wingWidth) private var wingWidth = 44.0
     @AppStorage(Pref.showWeekly) private var showWeekly = false
