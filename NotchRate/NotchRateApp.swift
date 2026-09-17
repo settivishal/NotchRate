@@ -38,7 +38,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var panel: NotchPanel!
     private(set) var state: NotchState!
     private var approvals: Approvals!
-    private var shelf = Shelf()
     private var tracker: ScreenTracker!
     private var poller: UsagePoller!
     private var collapseTask: Task<Void, Never>?
@@ -78,7 +77,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panel.setFrame(collapsedFrame, display: true)
         }
         panel = NotchPanel()
-        panel.contentView = NSHostingView(rootView: NotchView(store: store, state: state, shelf: shelf,
+        panel.contentView = NSHostingView(rootView: NotchView(store: store, state: state,
                                                               setExpanded: { [weak self] in self?.setExpanded($0) },
                                                               setPage: { [weak self] in self?.setPage($0) },
                                                               refresh: { [weak self] in self?.refresh() },

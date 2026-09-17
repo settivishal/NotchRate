@@ -21,7 +21,6 @@ enum Pref {
     static let planNotify = "planNotify"       // Bool, default true: notify when Claude Code presents a plan
     static let approvals = "approvals"         // Bool, default true: Allow/Deny island for permission prompts
     static let glass = "glass"                 // Bool, default true: Liquid Glass expanded card (off under Reduce Transparency)
-    static let shelf = "shelf"                 // [String] file paths dropped on the notch
     static let paceWarnedFor = "paceWarnedFor" // Double: session resets_at already warned about
 
     static func register() {
