@@ -87,7 +87,8 @@ struct NotchView: View {
         let geo = state.geometry
         let size = state.expanded ? geo.expandedSize(for: state.page, tall: state.tallCard, plan: state.approval?.isPlan == true)
                                   : geo.collapsedSize(island: state.approval != nil, blob: state.caffeinated)
-        TimelineView(.periodic(from: .now, by: state.approval == nil && !(state.expanded && state.page == .caffeine) ? 60 : 1)) { ctx in
+        // 1 s ticks only while something counts down (approval expiry, caffeine ring/timer).
+        TimelineView(.periodic(from: .now, by: state.approval == nil && !state.caffeinated ? 60 : 1)) { ctx in
             let blob = !state.expanded && state.caffeinated
             let shape = NotchShape(topRadius: geo.hasNotch ? 6 : 0, bottomRadius: state.expanded ? cardRadius : 12)
             ZStack(alignment: .top) {
@@ -97,17 +98,19 @@ struct NotchView: View {
                     caffeineBlob(now: ctx.date)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                 }
-                if state.expanded, let snap = store.primary {
-                    let level = snap.level(now: ctx.date, staleAfter: staleHours * 3600)
+                if state.expanded {
+                    let snap = store.primary  // Claude pages need usage data; the other tabs do not
                     VStack(spacing: 0) {
                         // Tab bar sits right under the notch: the card resizes from the bottom, so the
                         // cursor stays inside while switching pages (a bottom bar slid out from under it).
                         Color.clear.frame(height: geo.topHeight)
                         tabBar
                         switch state.page {
-                        case .overview: expanded(snap, level: level, now: ctx.date)
-                        case .trends: trends(snap, now: ctx.date)
-                        case .week: week(snap, now: ctx.date)
+                        case .overview where snap != nil: expanded(snap!, level: snap!.level(now: ctx.date, staleAfter: staleHours * 3600), now: ctx.date)
+                        case .trends where snap != nil: trends(snap!, now: ctx.date)
+                        case .week where snap != nil: week(snap!, now: ctx.date)
+                        case .overview, .trends, .week:
+                            Text("No usage data yet").font(.caption).foregroundStyle(.secondary).frame(maxHeight: .infinity)
                         case .caffeine: caffeinePage(now: ctx.date)
                         case .approval: approvalPage(now: ctx.date)
                         }
@@ -119,7 +122,7 @@ struct NotchView: View {
                 }
             }
             .frame(width: size.width, height: size.height)
-            .contentShape(Rectangle())
+            .contentShape(HoverArea(leadingInset: blob ? geo.blobWidth + NotchGeometry.blobGap : 0))  // skip the empty mirror strip left of the badge
             .pointerStyle(.default)  // no I-beam over labels
             .animation(animation, value: state.expanded)
             .animation(animation, value: state.page)
@@ -131,7 +134,6 @@ struct NotchView: View {
     private func hover(_ inside: Bool) {
         hoverTask?.cancel()
         if inside {
-            guard store.primary != nil else { return }
             hoverTask = Task {
                 try? await Task.sleep(for: .seconds(hoverDelay))
                 guard !Task.isCancelled else { return }
@@ -611,6 +613,12 @@ struct NotchView: View {
         let d = secs / 86400, h = (secs % 86400) / 3600, m = (secs % 3600) / 60
         return d > 0 ? "\(d)d \(h)h" : h > 0 ? "\(h)h \(m)m" : "\(m)m"
     }
+}
+
+/// Whole frame minus the transparent strip that mirrors the side blob on the left.
+struct HoverArea: Shape {
+    var leadingInset: CGFloat
+    func path(in r: CGRect) -> Path { Path(CGRect(x: r.minX + leadingInset, y: r.minY, width: r.width - leadingInset, height: r.height)) }
 }
 
 /// Small pill that lights up and shows a hand cursor on hover; chevrons alone were easy to miss.

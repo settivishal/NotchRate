@@ -120,7 +120,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let new, !new.isPlan, new.id != state.approval?.id { Notifier.post(title: "Claude", body: "\(new.tool) needs permission") }
         state.approval = new
         if state.expanded {
-            setPage(new == nil ? .overview : .approval)
+            if new != nil { setPage(.approval) } else if state.page == .approval { setPage(.overview) }
         } else {
             panel.setFrame(collapsedFrame, display: true)
         }
