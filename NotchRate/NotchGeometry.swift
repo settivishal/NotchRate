@@ -25,7 +25,7 @@ struct NotchGeometry {
     }
 
     static let islandWing: CGFloat = 96  // wider wings while an approval request is showing
-    static let tabBar: CGFloat = 34
+    static let tabBar: CGFloat = 56  // 32pt pills + 12pt above and below
 
     static let blobGap: CGFloat = 8
     var blobWidth: CGFloat { topHeight }  // iOS-style side activity: a circle as tall as the notch

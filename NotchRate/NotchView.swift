@@ -4,6 +4,7 @@ import SwiftUI
 /// Bottom bar categories. Each owns one or more pages; swipe moves within a tab.
 enum Tab: CaseIterable {
     case claude, caffeine
+    var title: String { self == .claude ? "Claude" : "Caffeinate" }
     var icon: String {
         switch self {
         case .claude: "gauge.with.dots.needle.33percent"
@@ -183,7 +184,7 @@ struct NotchView: View {
 
     /// Full request with the terminal's choices. Plans get the markdown and the three ExitPlanMode options.
     private func approvalPage(now: Date) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             if let r = state.approval {
                 header {
                     Text(now < r.expires ? "\(relative(r.expires.timeIntervalSince1970, now: now)) left" : "answer in terminal")
@@ -220,7 +221,7 @@ struct NotchView: View {
             }
         }
         .padding(.horizontal, 22)
-        .padding(.bottom, 14)
+        .padding(.bottom, 12)
         .foregroundStyle(.white)
         .transition(.opacity)
     }
@@ -231,12 +232,12 @@ struct NotchView: View {
         HStack(spacing: 8) {
             ForEach(Tab.allCases, id: \.self) { t in
                 let awake = t == .caffeine && state.caffeinated  // glows on every tab so the state is visible from Claude too
-                NavButton(icon: t.icon, tint: awake ? .orange : state.page.tab == t ? .white : nil) { setPage(t.pages[0]) }
+                NavButton(icon: t.icon, label: t.title, large: true, tint: awake ? .orange : state.page.tab == t ? .white : nil) { setPage(t.pages[0]) }
                     .shadow(color: awake ? .orange.opacity(0.8) : .clear, radius: 6)
             }
         }
-        .padding(.top, 6)
-        .padding(.bottom, 4)
+        .padding(.top, 12)
+        .padding(.bottom, 12)
     }
 
     /// Detached circle beside the badge, iOS Dynamic Island style: orange ring counts down, cup inside.
@@ -260,7 +261,7 @@ struct NotchView: View {
     private static let presets: [(String, TimeInterval)] = [("30m", 1800), ("1h", 3600), ("2h", 7200), ("∞", .infinity)]
 
     private func caffeinePage(now: Date) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 12) {
             header { Text(state.caffeinated ? "Mac stays awake" : "sleeping normally") }
             // Big countdown in the middle; ∞ for "until turned off".
             Text(state.caffeineUntil.map { $0 == .distantFuture ? "∞" : countdown($0, now: now) } ?? "OFF")
@@ -279,7 +280,7 @@ struct NotchView: View {
             .frame(maxWidth: .infinity)
         }
         .padding(.horizontal, 22)
-        .padding(.bottom, 14)
+        .padding(.bottom, 12)
         .foregroundStyle(.white)
         .transition(.opacity)
     }
@@ -353,7 +354,7 @@ struct NotchView: View {
 
     private func expanded(_ snap: UsageSnapshot, level: Level, now: Date) -> some View {
         let stale = level == .stale
-        return VStack(alignment: .leading, spacing: 10) {
+        return VStack(alignment: .leading, spacing: 12) {
             header {
                 Text(stale ? "offline · \(relative(snap.lastUpdated, now: now)) ago"
                      : now.timeIntervalSince1970 - snap.lastUpdated < 2 * max(30, pollSeconds) ? "live" : "updated \(relative(snap.lastUpdated, now: now)) ago")
@@ -396,7 +397,7 @@ struct NotchView: View {
             .font(.caption).foregroundStyle(.secondary)
         }
         .padding(.horizontal, 22)
-        .padding(.bottom, 14)
+        .padding(.bottom, 12)
         .foregroundStyle(.white)
         .opacity(stale ? 0.6 : 1)
         .transition(.opacity)
@@ -405,7 +406,7 @@ struct NotchView: View {
     /// Title row: sub-page pills when the tab has several pages, else the page title.
     private func header<Trailing: View>(@ViewBuilder trailing: () -> Trailing) -> some View {
         let pages = state.page.tab.pages
-        return HStack(spacing: 6) {
+        return HStack(spacing: 8) {
             if pages.count > 1, pages.contains(state.page) {
                 ForEach(pages, id: \.self) { p in
                     NavButton(label: p.title, tint: state.page == p ? .white : nil) { setPage(p) }
@@ -441,7 +442,7 @@ struct NotchView: View {
             }
         }
         .padding(.horizontal, 22)
-        .padding(.bottom, 14)
+        .padding(.bottom, 12)
         .foregroundStyle(.white)
         .transition(.opacity)
     }
@@ -497,7 +498,7 @@ struct NotchView: View {
     private func week(_ snap: UsageSnapshot, now: Date) -> some View {
         let stats = WeekStats(History.load(now: now), weeklyResetsAt: snap.weeklyResetsAt, now: now)
         let today = Calendar.current.startOfDay(for: now)
-        return VStack(alignment: .leading, spacing: 8) {
+        return VStack(alignment: .leading, spacing: 12) {
             header {
                 if let r = snap.weeklyResetsAt { Text("resets \(resetText(r, now: now))") }
             }
@@ -530,7 +531,7 @@ struct NotchView: View {
             .font(.caption).foregroundStyle(.secondary)
         }
         .padding(.horizontal, 22)
-        .padding(.bottom, 14)
+        .padding(.bottom, 12)
         .foregroundStyle(.white)
         .transition(.opacity)
     }
