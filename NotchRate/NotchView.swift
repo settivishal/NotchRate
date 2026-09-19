@@ -84,6 +84,8 @@ struct NotchView: View {
     @AppStorage(Pref.blobLeft) private var blobLeft = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hoverTask: Task<Void, Never>?
+    @State private var blobSlack = false  // frame keeps blob room until the last blob has popped back in
+    @State private var slackTask: Task<Void, Never>?
 
     private var animation: Animation {
         reduceMotion ? .easeOut(duration: 0.12) : .spring(response: 0.26, dampingFraction: 0.86)
@@ -97,17 +99,20 @@ struct NotchView: View {
 
     var body: some View {
         let geo = state.geometry
-        let size = state.expanded ? geo.expandedSize(for: state.page, tall: state.tallCard, plan: state.approval?.isPlan == true, blob: state.sideBlobs)
-                                  : geo.collapsedSize(blob: state.sideBlobs)
+        let size = state.expanded ? geo.expandedSize(for: state.page, tall: state.tallCard, plan: state.approval?.isPlan == true)
+                                  : geo.collapsedSize(blob: blobSlack)
         // 1 s ticks only while something counts down (approval expiry, caffeine ring/timer).
         TimelineView(.periodic(from: .now, by: state.approval == nil && !state.caffeinated ? 60 : 1)) { ctx in
             // Caffeine blob on one side (setting), Claude activity (approval, else busy, else done) on the other.
+            // A side is "merged" (1) while its blob is absent or the card is open.
             let claude = state.approval != nil || state.busy || state.done
+            let claudeMerge: CGFloat = state.expanded || !claude ? 1 : 0
+            let caffeineMerge: CGFloat = state.expanded || !state.caffeinated ? 1 : 0
             let shape = NotchShape(topRadius: geo.hasNotch ? 6 : 0, bottomRadius: state.expanded ? cardRadius : 12)
             ZStack(alignment: .top) {
-                GooBody(shape: shape, left: (blobLeft ? state.caffeinated : claude) ? geo.blobWidth : 0,
-                        right: (blobLeft ? claude : state.caffeinated) ? geo.blobWidth : 0,
-                        gap: NotchGeometry.blobGap, merge: state.expanded ? 1 : 0)
+                GooBody(shape: shape, blob: geo.blobWidth, gap: NotchGeometry.blobGap, slack: blobSlack, reach: state.expanded ? 1 : 0,
+                        left: blobLeft ? caffeineMerge : claudeMerge, right: blobLeft ? claudeMerge : caffeineMerge)
+                    .animation(gooAnimation, value: [claudeMerge, caffeineMerge])
                     .animation(gooAnimation, value: state.expanded)
                 if state.caffeinated { sideBlob(leading: blobLeft) { caffeineBlob(now: ctx.date) } }
                 if let r = state.approval { sideBlob(leading: !blobLeft) { approvalBlob(r, now: ctx.date) } }
@@ -135,14 +140,24 @@ struct NotchView: View {
                 }
             }
             .frame(width: size.width, height: size.height)
-            .contentShape(HoverArea(inset: !state.expanded && state.sideBlobs && !(state.caffeinated && claude) ? geo.blobWidth + NotchGeometry.blobGap : 0,
+            .contentShape(HoverArea(inset: !state.expanded && blobSlack && !(state.caffeinated && claude) ? geo.blobWidth + NotchGeometry.blobGap : 0,
                                     mirrorOnLeft: state.caffeinated ? !blobLeft : blobLeft))  // skip the empty strip mirroring a lone blob
             .pointerStyle(.default)  // no I-beam over labels
-            .animation(state.caffeinated && state.expanded ? animation.delay(0.1) : animation, value: state.expanded)  // blob lands first, then the card grows
+            .animation(state.sideBlobs && state.expanded ? animation.delay(0.1) : animation, value: state.expanded)  // blobs land first, then the card grows
             .animation(animation, value: state.page)
+            .animation(gooAnimation, value: [claudeMerge, caffeineMerge])  // blob pop-in / pop-out transitions
             .onHover(perform: hover)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .onChange(of: state.sideBlobs, initial: true) { _, on in
+            slackTask?.cancel()
+            if on { blobSlack = true; return }
+            slackTask = Task {  // matches AppDelegate.fitCollapsed's window shrink
+                try? await Task.sleep(for: .milliseconds(500))
+                guard !Task.isCancelled else { return }
+                blobSlack = false
+            }
+        }
     }
 
     private func hover(_ inside: Bool) {
@@ -160,10 +175,11 @@ struct NotchView: View {
 
     // MARK: side blobs
 
-    /// Detached circle beside the badge, iOS Dynamic Island style; rides the goo circle into the notch on expand.
+    /// Detached circle beside the badge, iOS Dynamic Island style; rides the goo circle into and out of the notch.
     private func sideBlob<V: View>(leading: Bool, @ViewBuilder _ content: () -> V) -> some View {
         let travel = state.geometry.blobWidth + NotchGeometry.blobGap
         let shown = !state.expanded
+        let inward = AnyTransition.offset(x: leading ? travel : -travel).combined(with: .opacity)
         return content()
             .padding(5)
             .frame(width: state.geometry.blobWidth, height: state.geometry.blobWidth)
@@ -172,6 +188,7 @@ struct NotchView: View {
             .opacity(shown ? 1 : 0)
             .allowsHitTesting(shown)
             .animation(gooAnimation, value: state.expanded)
+            .transition(inward)
     }
 
     /// Ring counts down `progress` 1 → 0 around `icon`.

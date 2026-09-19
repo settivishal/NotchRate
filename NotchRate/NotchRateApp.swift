@@ -76,10 +76,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         state = NotchState(geometry: NotchGeometry(screen: NSScreen.main ?? NSScreen.screens[0]))
-        state.onCaffeineChange = { [weak self] in
-            guard let self, !state.expanded else { return }
-            panel.setFrame(collapsedFrame, display: true)
-        }
+        state.onCaffeineChange = { [weak self] in self?.fitCollapsed() }
         panel = NotchPanel()
         panel.contentView = NSHostingView(rootView: NotchView(store: store, state: state,
                                                               setExpanded: { [weak self] in self?.setExpanded($0) },
@@ -117,6 +114,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private var collapsedFrame: NSRect { state.geometry.frame(for: state.geometry.collapsedSize(blob: state.sideBlobs)) }
 
+    /// Blob came or went while collapsed: grow the window at once, shrink it after the pop-in animation.
+    private func fitCollapsed() {
+        guard !state.expanded else { return }
+        collapseTask?.cancel()
+        let frame = collapsedFrame
+        if frame.width >= panel.frame.width { panel.setFrame(frame, display: true); return }
+        collapseTask = Task {
+            try? await Task.sleep(for: .milliseconds(500))
+            guard !Task.isCancelled, !state.expanded else { return }
+            panel.setFrame(collapsedFrame, display: true)
+        }
+    }
+
     private func updateVisibility(screen: NSScreen?) {
         let empty = store.primary == nil && state.approval == nil
         if empty || screen == nil || UserDefaults.standard.bool(forKey: Pref.hideBadge) { panel.orderOut(nil) } else { panel.orderFrontRegardless() }
@@ -130,7 +140,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if approvals.busy != state.busy || approvals.done != state.done {
             state.busy = approvals.busy
             state.done = approvals.done
-            if !state.expanded { panel.setFrame(collapsedFrame, display: true) }
+            fitCollapsed()
         }
         guard new != state.approval else { return }
         if let new, !new.isPlan, new.id != state.approval?.id { Notifier.post(title: "Claude", body: "\(new.tool) needs permission") }
@@ -138,7 +148,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if state.expanded {
             if new != nil { setPage(.approval) } else if state.page == .approval { setPage(.overview) }
         } else {
-            panel.setFrame(collapsedFrame, display: true)
+            fitCollapsed()
         }
         updateVisibility(screen: tracker.current)
     }
@@ -151,7 +161,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func expandedSize(for page: Page) -> CGSize {
-        state.geometry.expandedSize(for: page, tall: state.tallCard, plan: state.approval?.isPlan == true, blob: state.sideBlobs)
+        state.geometry.expandedSize(for: page, tall: state.tallCard, plan: state.approval?.isPlan == true)
     }
 
     /// Window grows before the expand animation and shrinks after the collapse one,

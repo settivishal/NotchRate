@@ -38,9 +38,9 @@ struct NotchGeometry {
     }
 
     /// `tall`: overview has the per-model row. `plan`: approval page shows a plan (needs reading room).
-    /// `blob`: card must stay at least as wide as the collapsed badge+blob, or a cursor over the blob
-    /// falls outside the expanded frame and the card flickers open/closed.
-    func expandedSize(for page: Page = .overview, tall: Bool = false, plan: Bool = false, blob: Bool = false) -> CGSize {
+    /// Always at least as wide as the collapsed badge with blobs: a cursor over a blob must stay inside
+    /// the card that opens (else it flickers), and the width must not jump when a blob appears mid-card.
+    func expandedSize(for page: Page = .overview, tall: Bool = false, plan: Bool = false) -> CGSize {
         let card = switch page {
         case .overview: CGSize(width: Self.expandedSize.width, height: Self.expandedSize.height + 24 + (tall ? 18 : 0))
         case .approval: CGSize(width: Self.expandedSize.width, height: plan ? 300 : 120)
@@ -48,7 +48,7 @@ struct NotchGeometry {
         case .week: CGSize(width: Self.expandedSize.width, height: 240)
         case .caffeine: CGSize(width: Self.expandedSize.width, height: Self.expandedSize.height + 24)  // same as overview
         }
-        return CGSize(width: max(card.width, collapsedSize(blob: blob).width), height: topHeight + card.height + Self.tabBar)
+        return CGSize(width: max(card.width, collapsedSize(blob: true).width), height: topHeight + card.height + Self.tabBar)
     }
 
     /// Top-center frame for a window of `size` on this screen.

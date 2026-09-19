@@ -30,36 +30,40 @@ struct NotchShape: Shape {
     }
 }
 
-/// Notch body plus up to one side blob per side, drawn through blur + alpha threshold so the
-/// blobs melt into the notch as `merge` runs 0 → 1 (Dynamic Island style). Diameter 0 = no blob.
+/// Notch body plus one blob slot per side, drawn through blur + alpha threshold so blobs melt into
+/// the notch (Dynamic Island style). Per side, `merge` 0 = blob out at rest, 1 = absorbed (or absent):
+/// animating it pops a new blob out of the notch and pulls it back in on expand.
 struct GooBody: View, @preconcurrency Animatable {
     var shape: NotchShape
+    var blob: CGFloat  // diameter
+    var gap: CGFloat
+    var slack: Bool    // frame has blob room on both sides (not animated: it jumps with the window)
+    var reach: CGFloat // 0 collapsed, 1 expanded: body takes the slack over, faster than the blobs travel
     var left: CGFloat
     var right: CGFloat
-    var gap: CGFloat
-    var merge: CGFloat
 
-    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, CGFloat> {
-        get { .init(shape.animatableData, merge) }
-        set { shape.animatableData = newValue.first; merge = newValue.second }
+    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, AnimatablePair<CGFloat, CGFloat>>> {
+        get { .init(shape.animatableData, .init(reach, .init(left, right))) }
+        set { shape.animatableData = newValue.first; reach = newValue.second.first; left = newValue.second.second.first; right = newValue.second.second.second }
     }
 
     var body: some View {
         Canvas { ctx, size in
-            let m = max(0, min(1, merge))
-            let d = max(left, right)
-            let inset = (d + gap) * max(0, 1 - 1.6 * m)  // body reaches out to the blob before it lands
+            let l = max(0, min(1, left)), r = max(0, min(1, right))
+            let inset = slack ? (blob + gap) * max(0, 1 - 1.6 * reach) : 0  // body reaches out to a blob before it lands
             let body = CGRect(x: inset, y: 0, width: size.width - 2 * inset, height: size.height)
-            if d > 0 {
+            if min(l, r) < 1 {
                 var goo = ctx
                 goo.addFilter(.alphaThreshold(min: 0.5, color: .black))
-                goo.addFilter(.blur(radius: 2 + 24 * m * (1 - m)))  // gooey only mid-transition
-                goo.drawLayer { l in
-                    l.fill(shape.path(in: body), with: .color(.black))
-                    let stretch = d * 1.8 * m * (1 - m)  // elongates toward the notch while moving
-                    let travel = merge * (gap + d)       // slides in under the notch
-                    if right > 0 { l.fill(Ellipse().path(in: CGRect(x: size.width - right - travel - stretch, y: 0, width: right + stretch, height: right)), with: .color(.black)) }
-                    if left > 0 { l.fill(Ellipse().path(in: CGRect(x: travel, y: 0, width: left + stretch, height: left)), with: .color(.black)) }
+                goo.addFilter(.blur(radius: 2 + 24 * max(l * (1 - l), r * (1 - r))))  // gooey only mid-transition
+                goo.drawLayer { c in
+                    c.fill(shape.path(in: body), with: .color(.black))
+                    for (m, leading) in [(l, true), (r, false)] where m < 1 {
+                        let stretch = blob * 1.8 * m * (1 - m)  // elongates toward the notch while moving
+                        let travel = m * (gap + blob)           // slides in under the notch
+                        let x = leading ? travel : size.width - blob - travel - stretch
+                        c.fill(Ellipse().path(in: CGRect(x: x, y: 0, width: blob + stretch, height: blob)), with: .color(.black))
+                    }
                 }
             }
             ctx.fill(shape.path(in: body), with: .color(.black))  // crisp edges over the blurred pass
