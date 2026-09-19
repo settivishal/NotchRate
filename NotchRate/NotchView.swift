@@ -39,7 +39,8 @@ final class NotchState {
     var tallCard = false  // overview shows a per-model row
     var approval: Approvals.Request?  // side blob with a countdown ring while set; hover opens the Allow/Deny page
     var busy = false                  // Claude Code is working on a prompt: pulsing blob
-    var sideBlobs: Bool { caffeinated || approval != nil || busy }  // collapsed window widens for them
+    var done = false                  // it finished and the terminal has not been opened since: check blob
+    var sideBlobs: Bool { caffeinated || approval != nil || busy || done }  // collapsed window widens for them
     /// nil = off, .distantFuture = until turned off, else auto-off at that time.
     var caffeineUntil: Date? {
         didSet {
@@ -70,6 +71,7 @@ struct NotchView: View {
     var refresh: () -> Void
     var togglePin: () -> Void
     var answer: (Approvals.Request, String) -> Void  // "allow", "allow <mode>", "deny"
+    var clearDone: () -> Void
 
     @AppStorage(Pref.hoverDelay) private var hoverDelay = 0.15
     @AppStorage(Pref.staleHours) private var staleHours = 2.0
@@ -99,8 +101,8 @@ struct NotchView: View {
                                   : geo.collapsedSize(blob: state.sideBlobs)
         // 1 s ticks only while something counts down (approval expiry, caffeine ring/timer).
         TimelineView(.periodic(from: .now, by: state.approval == nil && !state.caffeinated ? 60 : 1)) { ctx in
-            // Caffeine blob on one side (setting), Claude activity (approval, else busy) on the other.
-            let claude = state.approval != nil || state.busy
+            // Caffeine blob on one side (setting), Claude activity (approval, else busy, else done) on the other.
+            let claude = state.approval != nil || state.busy || state.done
             let shape = NotchShape(topRadius: geo.hasNotch ? 6 : 0, bottomRadius: state.expanded ? cardRadius : 12)
             ZStack(alignment: .top) {
                 GooBody(shape: shape, left: (blobLeft ? state.caffeinated : claude) ? geo.blobWidth : 0,
@@ -110,6 +112,7 @@ struct NotchView: View {
                 if state.caffeinated { sideBlob(leading: blobLeft) { caffeineBlob(now: ctx.date) } }
                 if let r = state.approval { sideBlob(leading: !blobLeft) { approvalBlob(r, now: ctx.date) } }
                 else if state.busy { sideBlob(leading: !blobLeft) { busyBlob } }
+                else if state.done { sideBlob(leading: !blobLeft) { doneBlob } }
                 if state.expanded {
                     let snap = store.primary  // Claude pages need usage data; the other tabs do not
                     VStack(spacing: 0) {
@@ -193,6 +196,13 @@ struct NotchView: View {
         Image(systemName: "sparkles").resizable().scaledToFit().frame(width: state.geometry.blobWidth * 0.42)
             .foregroundStyle(.white).symbolEffect(.pulse)
             .onTapGesture { setPage(.overview); setExpanded(true) }
+    }
+
+    /// Persists until a terminal app comes to the front (or a click).
+    private var doneBlob: some View {
+        Image(systemName: "checkmark").resizable().scaledToFit().frame(width: state.geometry.blobWidth * 0.36)
+            .fontWeight(.bold).foregroundStyle(.green)
+            .onTapGesture { clearDone() }
     }
 
     /// Full request with the terminal's choices. Plans get the markdown and the three ExitPlanMode options.

@@ -43,6 +43,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var collapseTask: Task<Void, Never>?
     private var previewing = false
     private var hotkeyOpened = false
+    static let terminals: Set<String> = [
+        "com.googlecode.iterm2", "com.apple.Terminal", "com.mitchellh.ghostty", "dev.warp.Warp-Stable", "net.kovidgoyal.kitty",
+        "org.alacritty", "com.github.wez.wezterm", "com.microsoft.VSCode", "com.todesktop.230313mzl4w4u92",  // last one is Cursor
+    ]
 
     var summary: String {
         guard let s = store?.primary else { return "No usage data yet" }
@@ -82,7 +86,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                               setPage: { [weak self] in self?.setPage($0) },
                                                               refresh: { [weak self] in self?.refresh() },
                                                               togglePin: { [weak self] in self?.togglePin() },
-                                                              answer: { [weak self] in self?.approvals.answer($0, $1) }))
+                                                              answer: { [weak self] in self?.approvals.answer($0, $1) },
+                                                              clearDone: { [weak self] in self?.approvals.clearDone() }))
+        // The "done" blob persists until the user looks at a terminal.
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.didActivateApplicationNotification, object: nil, queue: .main) { [weak self] n in
+            guard let id = (n.userInfo?[NSWorkspace.applicationUserInfoKey] as? NSRunningApplication)?.bundleIdentifier, Self.terminals.contains(id) else { return }
+            Task { @MainActor in self?.approvals.clearDone() }
+        }
         panel.onSwipe = { [weak self] in self?.swipe($0) }
         HotKey.set(enabled: UserDefaults.standard.bool(forKey: Pref.hotkey)) { [weak self] in self?.toggleFromHotkey() }
 
@@ -113,12 +123,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// Pending permission request → side blob (collapsed) or page (expanded); notify once per new request.
-    /// Busy flag → pulsing blob.
+    /// Busy → pulsing blob, done → check blob.
     private func approvalsChanged() {
         let defaults = UserDefaults.standard
         let new = approvals.current.flatMap { defaults.bool(forKey: $0.isPlan ? Pref.planNotify : Pref.approvals) ? $0 : nil }
-        if approvals.busy != state.busy {
+        if approvals.busy != state.busy || approvals.done != state.done {
             state.busy = approvals.busy
+            state.done = approvals.done
             if !state.expanded { panel.setFrame(collapsedFrame, display: true) }
         }
         guard new != state.approval else { return }

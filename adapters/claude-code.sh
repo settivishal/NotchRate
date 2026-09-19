@@ -9,8 +9,10 @@
 #               starting with "{" (the app builds it when updatedInput must be echoed back).
 #               No answer in time -> exit silently so the terminal prompt shows as usual.
 #   clear       Any later hook: drop this session's pending request (the user answered in the terminal).
-#               Also keeps the busy marker: UserPromptSubmit/PreToolUse/PostToolUse touch pending/busy-<id>,
-#               Stop/SessionEnd/Notification (idle) remove it. Notification never touches pending requests.
+#               Also keeps the activity markers: UserPromptSubmit/PreToolUse/PostToolUse touch
+#               pending/busy-<id>; Stop swaps it for done-<id> (the app clears that when a terminal
+#               comes to the front); SessionEnd removes both; Notification (idle) only removes busy
+#               and never touches pending requests.
 set -u
 
 OUT_DIR="${NOTCH_USAGE_DIR:-$HOME/.notch-usage}"
@@ -29,9 +31,10 @@ case "${1:-}" in
     payload=$(cat)
     id=$(session_id "$payload")
     case "$(field hook_event_name "$payload")" in
-      UserPromptSubmit|PreToolUse|PostToolUse) mkdir -p "$OUT_DIR/pending"; : > "$OUT_DIR/pending/busy-${id:-$$}" ;;
+      UserPromptSubmit|PreToolUse|PostToolUse) mkdir -p "$OUT_DIR/pending"; rm -f "$OUT_DIR/pending/done-${id:-*}"; : > "$OUT_DIR/pending/busy-${id:-$$}" ;;
+      Stop) mkdir -p "$OUT_DIR/pending"; rm -f "$OUT_DIR/pending/busy-${id:-*}"; : > "$OUT_DIR/pending/done-${id:-$$}" ;;
       Notification) rm -f "$OUT_DIR/pending/busy-${id:-*}"; exit 0 ;;  # idle prompt: not busy, but the terminal may still be asking
-      *) rm -f "$OUT_DIR/pending/busy-${id:-*}" ;;
+      *) rm -f "$OUT_DIR/pending/busy-${id:-*}" "$OUT_DIR/pending/done-${id:-*}" ;;
     esac
     rm -f "$OUT_DIR/pending/${id:-*}.raw" "$OUT_DIR/pending/plan-${id:-*}.raw"
     exit 0

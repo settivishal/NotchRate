@@ -62,7 +62,11 @@ printf '%s' '{"session_id":"s1","hook_event_name":"Notification"}' | ./claude-co
 [ ! -f "$NOTCH_USAGE_DIR/pending/busy-s1" ] || { echo "FAIL busy after idle"; exit 1; }
 [ -f "$NOTCH_USAGE_DIR/pending/plan-s1.raw" ] || { echo "FAIL notification cleared request"; exit 1; }
 printf '%s' '{"session_id":"s1","hook_event_name":"Stop"}' | ./claude-code.sh clear
-[ -z "$(ls "$NOTCH_USAGE_DIR/pending")" ] || { echo "FAIL stop"; exit 1; }
+[ "$(ls "$NOTCH_USAGE_DIR/pending")" = "done-s1" ] || { echo "FAIL stop"; exit 1; }
+printf '%s' '{"session_id":"s1","hook_event_name":"UserPromptSubmit"}' | ./claude-code.sh clear
+[ "$(ls "$NOTCH_USAGE_DIR/pending")" = "busy-s1" ] || { echo "FAIL prompt after done"; exit 1; }
+printf '%s' '{"session_id":"s1","hook_event_name":"SessionEnd"}' | ./claude-code.sh clear
+[ -z "$(ls "$NOTCH_USAGE_DIR/pending")" ] || { echo "FAIL session end"; exit 1; }
 
 rm -rf "$NOTCH_USAGE_DIR"
 echo "adapter OK"
