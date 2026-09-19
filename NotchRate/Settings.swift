@@ -13,10 +13,12 @@ enum Pref {
     static let cardRadius = "cardRadius"       // Double points, default 28: expanded card corner radius
     static let badgeCountdown = "badgeCountdown" // Bool, default false: badge shows time to reset instead of %
     static let badgeRing = "badgeRing"         // Bool, default false: tiny arc instead of the dot
+    static let blobLeft = "blobLeft"           // Bool, default false: caffeine blob sits left of the notch
     static let menuBarText = "menuBarText"     // Bool, default false: menu bar shows "5h 42%" instead of icon
     static let warnPct = "warnPct"             // Double, default 85: first notification threshold
     static let fullPct = "fullPct"             // Double, default 100: second notification threshold
     static let paceWarn = "paceWarn"           // Bool, default true: warn when pace hits 100% before reset
+    static let resetNotify = "resetNotify"     // Bool, default true: notify when a limit you were near resets
     static let hotkey = "hotkey"               // Bool, default true: ⌃⌥N toggles the card
     static let planNotify = "planNotify"       // Bool, default true: notify when Claude Code presents a plan
     static let approvals = "approvals"         // Bool, default true: Allow/Deny island for permission prompts
@@ -25,8 +27,8 @@ enum Pref {
     static func register() {
         UserDefaults.standard.register(defaults: [
             staleHours: 2.0, hoverDelay: 0.15, allDisplays: true, wingWidth: 44.0, showWeekly: false, hideBadge: false,
-            ringGauges: true, pollSeconds: 60.0, cardRadius: 28.0, badgeCountdown: false, badgeRing: false,
-            menuBarText: false, warnPct: 85.0, fullPct: 100.0, paceWarn: true, hotkey: true, planNotify: true, approvals: true,
+            ringGauges: true, pollSeconds: 60.0, cardRadius: 28.0, badgeCountdown: false, badgeRing: false, blobLeft: false,
+            menuBarText: false, warnPct: 85.0, fullPct: 100.0, paceWarn: true, resetNotify: true, hotkey: true, planNotify: true, approvals: true,
         ])
     }
     static var staleAfter: TimeInterval { UserDefaults.standard.double(forKey: staleHours) * 3600 }
@@ -45,10 +47,12 @@ struct SettingsView: View {
     @AppStorage(Pref.cardRadius) private var cardRadius = 28.0
     @AppStorage(Pref.badgeCountdown) private var badgeCountdown = false
     @AppStorage(Pref.badgeRing) private var badgeRing = false
+    @AppStorage(Pref.blobLeft) private var blobLeft = false
     @AppStorage(Pref.menuBarText) private var menuBarText = false
     @AppStorage(Pref.warnPct) private var warnPct = 85.0
     @AppStorage(Pref.fullPct) private var fullPct = 100.0
     @AppStorage(Pref.paceWarn) private var paceWarn = true
+    @AppStorage(Pref.resetNotify) private var resetNotify = true
     @AppStorage(Pref.hotkey) private var hotkey = true
     @AppStorage(Pref.planNotify) private var planNotify = true
     @AppStorage(Pref.approvals) private var approvals = true
@@ -74,6 +78,7 @@ struct SettingsView: View {
                 Toggle("Show weekly (7d) in badge", isOn: $showWeekly)
                 Toggle("Time to reset instead of %", isOn: $badgeCountdown)
                 Toggle("Ring instead of dot", isOn: $badgeRing)
+                Toggle("Caffeine blob on the left", isOn: $blobLeft)
                 Toggle("Follow mouse to every display (pill on plain displays)", isOn: $allDisplays)
                 Slider(value: $wingWidth, in: 30...120, step: 2) { Text("Badge width beside notch: \(Int(wingWidth))pt") }
             }
@@ -94,6 +99,7 @@ struct SettingsView: View {
                 Slider(value: $warnPct, in: 50...99, step: 1) { Text("Warn at \(Int(warnPct))%") }
                 Slider(value: $fullPct, in: 60...100, step: 1) { Text("Alert at \(Int(fullPct))%") }
                 Toggle("Warn when pace hits 100% before reset", isOn: $paceWarn)
+                Toggle("Notify when a limit resets after passing the first threshold", isOn: $resetNotify)
             }
             Section("Claude Code") {
                 Toggle("Allow/Deny island for permission prompts", isOn: $approvals)

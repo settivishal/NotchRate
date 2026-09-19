@@ -22,6 +22,17 @@ enum Notifier {
         }
     }
 
+    /// Pure: a bucket that was at or past `threshold` and dropped back under 10% has rolled over.
+    static func resets(old: UsageSnapshot?, new: UsageSnapshot, threshold: Double = 85) -> [String] {
+        let buckets: [(String, Double?, Double?)] = [
+            ("Session", old?.sessionUsedPct, new.sessionUsedPct),
+            ("Weekly", old?.weeklyUsedPct, new.weeklyUsedPct),
+        ]
+        return buckets.compactMap { name, before, after in
+            (before ?? 0) >= threshold && (after ?? 0) < 10 ? "\(name) limit reset" : nil
+        }
+    }
+
     /// Pure: message when the current burn rate reaches 100% before the session resets.
     static func pace(_ snap: UsageSnapshot, ratePerHour: Double, now: Date = .now) -> String? {
         guard let pct = snap.sessionUsedPct, let resets = snap.sessionResetsAt, ratePerHour > 0, pct < 100 else { return nil }
@@ -38,6 +49,7 @@ enum Notifier {
         for snap in new {
             let prev = old.first { $0.tool == snap.tool }
             var msgs = crossings(old: prev, new: snap, thresholds: Pref.thresholds)
+            if defaults.bool(forKey: Pref.resetNotify) { msgs += resets(old: prev, new: snap, threshold: Pref.thresholds[0]) }
             if defaults.bool(forKey: Pref.paceWarn), let resets = snap.sessionResetsAt, defaults.double(forKey: Pref.paceWarnedFor) != resets,
                let m = pace(snap, ratePerHour: History.rate(History.load(), \.s, hours: 1)) {
                 msgs.append(m)

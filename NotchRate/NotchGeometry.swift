@@ -24,23 +24,23 @@ struct NotchGeometry {
         topHeight = hasNotch ? screen.safeAreaInsets.top : screen.frame.maxY - screen.visibleFrame.maxY
     }
 
-    static let islandWing: CGFloat = 96  // wider wings while an approval request is showing
     static let tabBar: CGFloat = 56  // 32pt pills + 12pt above and below
 
     static let blobGap: CGFloat = 8
     var blobWidth: CGFloat { topHeight }  // iOS-style side activity: a circle as tall as the notch
 
-    var collapsedSize: CGSize { collapsedSize(island: false) }
+    var collapsedSize: CGSize { collapsedSize(blob: false) }
 
-    /// `blob`: a detached activity circle beside the badge; the window grows symmetrically so the badge stays centred.
-    func collapsedSize(island: Bool, blob: Bool = false) -> CGSize {
-        let wing = island ? Self.islandWing : wingWidth
-        let badge = hasNotch ? notchWidth + 2 * wing : island ? 2 * Self.islandWing : Self.pillWidth
+    /// `blob`: detached activity circles beside the badge; the window grows symmetrically so the badge stays centred.
+    func collapsedSize(blob: Bool) -> CGSize {
+        let badge = hasNotch ? notchWidth + 2 * wingWidth : Self.pillWidth
         return CGSize(width: badge + (blob ? 2 * (blobWidth + Self.blobGap) : 0), height: topHeight)
     }
 
     /// `tall`: overview has the per-model row. `plan`: approval page shows a plan (needs reading room).
-    func expandedSize(for page: Page = .overview, tall: Bool = false, plan: Bool = false) -> CGSize {
+    /// `blob`: card must stay at least as wide as the collapsed badge+blob, or a cursor over the blob
+    /// falls outside the expanded frame and the card flickers open/closed.
+    func expandedSize(for page: Page = .overview, tall: Bool = false, plan: Bool = false, blob: Bool = false) -> CGSize {
         let card = switch page {
         case .overview: CGSize(width: Self.expandedSize.width, height: Self.expandedSize.height + 24 + (tall ? 18 : 0))
         case .approval: CGSize(width: Self.expandedSize.width, height: plan ? 300 : 120)
@@ -48,7 +48,7 @@ struct NotchGeometry {
         case .week: CGSize(width: Self.expandedSize.width, height: 240)
         case .caffeine: CGSize(width: Self.expandedSize.width, height: Self.expandedSize.height + 24)  // same as overview
         }
-        return CGSize(width: max(card.width, collapsedSize.width), height: topHeight + card.height + Self.tabBar)
+        return CGSize(width: max(card.width, collapsedSize(blob: blob).width), height: topHeight + card.height + Self.tabBar)
     }
 
     /// Top-center frame for a window of `size` on this screen.

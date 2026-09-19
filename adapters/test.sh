@@ -54,5 +54,15 @@ printf '%s' '{"session_id":"s2"}' | ./claude-code.sh clear
 printf '%s' '{"session_id":"s1"}' | ./claude-code.sh clear
 [ -z "$(ls "$NOTCH_USAGE_DIR/pending")" ] || { echo "FAIL clear"; exit 1; }
 
+# Busy marker follows the prompt lifecycle; Notification clears busy but leaves requests alone.
+printf '%s' '{"session_id":"s1","hook_event_name":"UserPromptSubmit"}' | ./claude-code.sh clear
+[ -f "$NOTCH_USAGE_DIR/pending/busy-s1" ] || { echo "FAIL busy set"; exit 1; }
+printf '%s' "$plan" > "$NOTCH_USAGE_DIR/pending/plan-s1.raw"
+printf '%s' '{"session_id":"s1","hook_event_name":"Notification"}' | ./claude-code.sh clear
+[ ! -f "$NOTCH_USAGE_DIR/pending/busy-s1" ] || { echo "FAIL busy after idle"; exit 1; }
+[ -f "$NOTCH_USAGE_DIR/pending/plan-s1.raw" ] || { echo "FAIL notification cleared request"; exit 1; }
+printf '%s' '{"session_id":"s1","hook_event_name":"Stop"}' | ./claude-code.sh clear
+[ -z "$(ls "$NOTCH_USAGE_DIR/pending")" ] || { echo "FAIL stop"; exit 1; }
+
 rm -rf "$NOTCH_USAGE_DIR"
 echo "adapter OK"

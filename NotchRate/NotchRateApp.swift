@@ -105,17 +105,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateVisibility(screen: screen)
     }
 
-    private var collapsedFrame: NSRect { state.geometry.frame(for: state.geometry.collapsedSize(island: state.approval != nil, blob: state.caffeinated)) }
+    private var collapsedFrame: NSRect { state.geometry.frame(for: state.geometry.collapsedSize(blob: state.sideBlobs)) }
 
     private func updateVisibility(screen: NSScreen?) {
         let empty = store.primary == nil && state.approval == nil
         if empty || screen == nil || UserDefaults.standard.bool(forKey: Pref.hideBadge) { panel.orderOut(nil) } else { panel.orderFrontRegardless() }
     }
 
-    /// Pending permission request → island (collapsed) or banner (expanded); notify once per new request.
+    /// Pending permission request → side blob (collapsed) or page (expanded); notify once per new request.
+    /// Busy flag → pulsing blob.
     private func approvalsChanged() {
         let defaults = UserDefaults.standard
         let new = approvals.current.flatMap { defaults.bool(forKey: $0.isPlan ? Pref.planNotify : Pref.approvals) ? $0 : nil }
+        if approvals.busy != state.busy {
+            state.busy = approvals.busy
+            if !state.expanded { panel.setFrame(collapsedFrame, display: true) }
+        }
         guard new != state.approval else { return }
         if let new, !new.isPlan, new.id != state.approval?.id { Notifier.post(title: "Claude", body: "\(new.tool) needs permission") }
         state.approval = new
@@ -135,7 +140,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func expandedSize(for page: Page) -> CGSize {
-        state.geometry.expandedSize(for: page, tall: state.tallCard, plan: state.approval?.isPlan == true)
+        state.geometry.expandedSize(for: page, tall: state.tallCard, plan: state.approval?.isPlan == true, blob: state.sideBlobs)
     }
 
     /// Window grows before the expand animation and shrinks after the collapse one,

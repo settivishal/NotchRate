@@ -21,6 +21,7 @@ final class Approvals {
     nonisolated static let planWait: TimeInterval = 90
 
     private(set) var pending: [Request] = []
+    private(set) var busy = false  // any session between UserPromptSubmit and Stop (`busy-<id>` marker files)
     var onPlanReady: (() -> Void)?
     var onChange: (() -> Void)?
 
@@ -65,9 +66,12 @@ final class Approvals {
     private func reload() {
         let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
         let new = files.filter { $0.pathExtension == "raw" }.compactMap(Self.parse).sorted { $0.expires < $1.expires }
+        // ponytail: Stop never fires on an interrupt, so a marker older than 30 min counts as stale.
+        let nowBusy = files.contains { $0.lastPathComponent.hasPrefix("busy-") && ((try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast) > .now - 1800 }
         if new.contains(where: \.isPlan) && !pending.contains(where: \.isPlan) { onPlanReady?() }
-        guard new != pending else { return }
+        guard new != pending || nowBusy != busy else { return }
         pending = new
+        busy = nowBusy
         onChange?()
     }
 

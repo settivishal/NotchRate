@@ -37,7 +37,9 @@ final class NotchState {
     var refreshing = false
     var pinned = false
     var tallCard = false  // overview shows a per-model row
-    var approval: Approvals.Request?  // collapsed badge becomes an Allow/Deny island while set
+    var approval: Approvals.Request?  // side blob with a countdown ring while set; hover opens the Allow/Deny page
+    var busy = false                  // Claude Code is working on a prompt: pulsing blob
+    var sideBlobs: Bool { caffeinated || approval != nil || busy }  // collapsed window widens for them
     /// nil = off, .distantFuture = until turned off, else auto-off at that time.
     var caffeineUntil: Date? {
         didSet {
@@ -77,6 +79,7 @@ struct NotchView: View {
     @AppStorage(Pref.cardRadius) private var cardRadius = 28.0
     @AppStorage(Pref.badgeCountdown) private var badgeCountdown = false
     @AppStorage(Pref.badgeRing) private var badgeRing = false
+    @AppStorage(Pref.blobLeft) private var blobLeft = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var hoverTask: Task<Void, Never>?
 
@@ -84,21 +87,29 @@ struct NotchView: View {
         reduceMotion ? .easeOut(duration: 0.12) : .spring(response: 0.26, dampingFraction: 0.86)
     }
 
+    /// Blob merge: bouncier than the card, and on collapse it waits for the card to shrink before popping out.
+    private var gooAnimation: Animation {
+        let spring: Animation = reduceMotion ? .easeOut(duration: 0.12) : .spring(response: 0.3, dampingFraction: 0.78)
+        return state.expanded ? spring : spring.delay(0.12)
+    }
+
     var body: some View {
         let geo = state.geometry
-        let size = state.expanded ? geo.expandedSize(for: state.page, tall: state.tallCard, plan: state.approval?.isPlan == true)
-                                  : geo.collapsedSize(island: state.approval != nil, blob: state.caffeinated)
+        let size = state.expanded ? geo.expandedSize(for: state.page, tall: state.tallCard, plan: state.approval?.isPlan == true, blob: state.sideBlobs)
+                                  : geo.collapsedSize(blob: state.sideBlobs)
         // 1 s ticks only while something counts down (approval expiry, caffeine ring/timer).
         TimelineView(.periodic(from: .now, by: state.approval == nil && !state.caffeinated ? 60 : 1)) { ctx in
-            let blob = !state.expanded && state.caffeinated
+            // Caffeine blob on one side (setting), Claude activity (approval, else busy) on the other.
+            let claude = state.approval != nil || state.busy
             let shape = NotchShape(topRadius: geo.hasNotch ? 6 : 0, bottomRadius: state.expanded ? cardRadius : 12)
             ZStack(alignment: .top) {
-                shape.fill(.black)
-                    .padding(.horizontal, blob ? geo.blobWidth + NotchGeometry.blobGap : 0)  // leave room for the side blob
-                if blob {
-                    caffeineBlob(now: ctx.date)
-                        .frame(maxWidth: .infinity, alignment: .trailing)
-                }
+                GooBody(shape: shape, left: (blobLeft ? state.caffeinated : claude) ? geo.blobWidth : 0,
+                        right: (blobLeft ? claude : state.caffeinated) ? geo.blobWidth : 0,
+                        gap: NotchGeometry.blobGap, merge: state.expanded ? 1 : 0)
+                    .animation(gooAnimation, value: state.expanded)
+                if state.caffeinated { sideBlob(leading: blobLeft) { caffeineBlob(now: ctx.date) } }
+                if let r = state.approval { sideBlob(leading: !blobLeft) { approvalBlob(r, now: ctx.date) } }
+                else if state.busy { sideBlob(leading: !blobLeft) { busyBlob } }
                 if state.expanded {
                     let snap = store.primary  // Claude pages need usage data; the other tabs do not
                     VStack(spacing: 0) {
@@ -116,16 +127,15 @@ struct NotchView: View {
                         case .approval: approvalPage(now: ctx.date)
                         }
                     }
-                } else if let r = state.approval {
-                    island(r, now: ctx.date)
                 } else if let snap = store.primary {
                     collapsed(snap, level: snap.level(now: ctx.date, staleAfter: staleHours * 3600), now: ctx.date)
                 }
             }
             .frame(width: size.width, height: size.height)
-            .contentShape(HoverArea(leadingInset: blob ? geo.blobWidth + NotchGeometry.blobGap : 0))  // skip the empty mirror strip left of the badge
+            .contentShape(HoverArea(inset: !state.expanded && state.sideBlobs && !(state.caffeinated && claude) ? geo.blobWidth + NotchGeometry.blobGap : 0,
+                                    mirrorOnLeft: state.caffeinated ? !blobLeft : blobLeft))  // skip the empty strip mirroring a lone blob
             .pointerStyle(.default)  // no I-beam over labels
-            .animation(animation, value: state.expanded)
+            .animation(state.caffeinated && state.expanded ? animation.delay(0.1) : animation, value: state.expanded)  // blob lands first, then the card grows
             .animation(animation, value: state.page)
             .onHover(perform: hover)
         }
@@ -145,41 +155,44 @@ struct NotchView: View {
         }
     }
 
-    // MARK: island
+    // MARK: side blobs
 
-    /// Permission request from Claude Code. Buttons vanish once the hook gave up and the terminal prompt took over.
-    private func island(_ r: Approvals.Request, now: Date) -> some View {
-        let geo = state.geometry
-        let wing = geo.hasNotch ? NotchGeometry.islandWing : nil
-        return HStack(spacing: 0) {
-            HStack(spacing: 5) {
-                Image(systemName: r.isPlan ? "list.bullet.clipboard" : "exclamationmark.shield.fill").foregroundStyle(.orange)
-                Text(r.isPlan ? "Plan ready" : r.tool).lineLimit(1).minimumScaleFactor(0.6)
-            }
-            .font(.system(size: 12, weight: .semibold, design: .rounded)).foregroundStyle(.white)
-            .padding(.leading, geo.hasNotch ? 12 : 0)
-            .frame(width: wing)
-            if geo.hasNotch { Color.clear.frame(width: geo.notchWidth) }
-            Group {
-                if now >= r.expires {
-                    HStack(spacing: 4) {
-                        Image(systemName: "terminal").font(.caption)
-                        Text("in terminal").font(.caption2)
-                    }
-                    .foregroundStyle(.gray)
-                } else if r.isPlan {
-                    Text("hover to review").font(.caption2).foregroundStyle(.gray)
-                } else {
-                    HStack(spacing: 6) {
-                        NavButton(icon: "checkmark", tint: .green) { answer(r, "allow") }
-                        NavButton(icon: "xmark", tint: .red) { answer(r, "deny") }
-                    }
-                }
-            }
-            .padding(.trailing, geo.hasNotch ? 12 : 0)
-            .frame(width: wing, alignment: geo.hasNotch ? .center : .leading)
+    /// Detached circle beside the badge, iOS Dynamic Island style; rides the goo circle into the notch on expand.
+    private func sideBlob<V: View>(leading: Bool, @ViewBuilder _ content: () -> V) -> some View {
+        let travel = state.geometry.blobWidth + NotchGeometry.blobGap
+        let shown = !state.expanded
+        return content()
+            .padding(5)
+            .frame(width: state.geometry.blobWidth, height: state.geometry.blobWidth)
+            .frame(maxWidth: .infinity, alignment: leading ? .leading : .trailing)
+            .offset(x: shown ? 0 : leading ? travel : -travel)
+            .opacity(shown ? 1 : 0)
+            .allowsHitTesting(shown)
+            .animation(gooAnimation, value: state.expanded)
+    }
+
+    /// Ring counts down `progress` 1 → 0 around `icon`.
+    private func ringBlob(progress: Double, icon: String, tint: Color) -> some View {
+        ZStack {
+            Circle().stroke(tint.opacity(0.25), lineWidth: 2.5)
+            Circle().trim(from: 0, to: progress)
+                .stroke(tint, style: StrokeStyle(lineWidth: 2.5, lineCap: .round)).rotationEffect(.degrees(-90))
+            Image(systemName: icon).resizable().scaledToFit().frame(width: state.geometry.blobWidth * 0.38).foregroundStyle(tint)
         }
-        .frame(height: geo.topHeight)
+    }
+
+    /// Permission request: ring runs out as the hook's wait expires, then the terminal prompt has it.
+    private func approvalBlob(_ r: Approvals.Request, now: Date) -> some View {
+        let expired = now >= r.expires
+        let progress = max(0, min(1, r.expires.timeIntervalSince(now) / (r.isPlan ? Approvals.planWait : Approvals.wait)))
+        return ringBlob(progress: progress, icon: expired ? "terminal" : r.isPlan ? "list.bullet.clipboard" : "exclamationmark.shield.fill", tint: expired ? .gray : .orange)
+            .onTapGesture { setPage(.approval); setExpanded(true) }
+    }
+
+    private var busyBlob: some View {
+        Image(systemName: "sparkles").resizable().scaledToFit().frame(width: state.geometry.blobWidth * 0.42)
+            .foregroundStyle(.white).symbolEffect(.pulse)
+            .onTapGesture { setPage(.overview); setExpanded(true) }
     }
 
     /// Full request with the terminal's choices. Plans get the markdown and the three ExitPlanMode options.
@@ -240,22 +253,13 @@ struct NotchView: View {
         .padding(.bottom, 12)
     }
 
-    /// Detached circle beside the badge, iOS Dynamic Island style: orange ring counts down, cup inside.
+    /// Orange ring counts down the caffeine timer, cup inside.
     private func caffeineBlob(now: Date) -> some View {
-        let d = state.geometry.blobWidth
         let progress: Double = state.caffeineUntil.map { until in
             until == .distantFuture ? 1 : max(0, min(1, until.timeIntervalSince(now) / until.timeIntervalSince(state.caffeineStarted)))
         } ?? 0
-        return ZStack {
-            Circle().fill(.black)
-            Circle().stroke(.orange.opacity(0.25), lineWidth: 2.5)
-            Circle().trim(from: 0, to: progress)
-                .stroke(.orange, style: StrokeStyle(lineWidth: 2.5, lineCap: .round)).rotationEffect(.degrees(-90))
-            Image(systemName: "cup.and.saucer.fill").resizable().scaledToFit().frame(width: d * 0.38).foregroundStyle(.orange)
-        }
-        .padding(5)
-        .frame(width: d, height: d)
-        .onTapGesture { setPage(.caffeine); setExpanded(true) }
+        return ringBlob(progress: progress, icon: "cup.and.saucer.fill", tint: .orange)
+            .onTapGesture { setPage(.caffeine); setExpanded(true) }
     }
 
     private static let presets: [(String, TimeInterval)] = [("30m", 1800), ("1h", 3600), ("2h", 7200), ("∞", .infinity)]
@@ -616,10 +620,11 @@ struct NotchView: View {
     }
 }
 
-/// Whole frame minus the transparent strip that mirrors the side blob on the left.
+/// Whole frame minus the transparent strip that mirrors the side blob on the other side.
 struct HoverArea: Shape {
-    var leadingInset: CGFloat
-    func path(in r: CGRect) -> Path { Path(CGRect(x: r.minX + leadingInset, y: r.minY, width: r.width - leadingInset, height: r.height)) }
+    var inset: CGFloat
+    var mirrorOnLeft: Bool
+    func path(in r: CGRect) -> Path { Path(CGRect(x: r.minX + (mirrorOnLeft ? inset : 0), y: r.minY, width: r.width - inset, height: r.height)) }
 }
 
 /// Small pill that lights up and shows a hand cursor on hover; chevrons alone were easy to miss.

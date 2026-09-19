@@ -43,9 +43,10 @@ enum Statusline {
     private static var current: [String: Any] { (try? JSONSerialization.jsonObject(with: Data(contentsOf: settings)) as? [String: Any]) ?? [:] }
     private static var statusLineInstalled: Bool { (current["statusLine"] as? [String: Any])?["command"] as? String == adapter.path }
 
-    /// Permission island hooks: `permission` blocks on PermissionRequest, `clear` drops stale requests.
+    /// Approval blob hooks: `permission` blocks on PermissionRequest, `clear` drops stale requests and tracks the busy marker.
     static let hookEvents: [String: String] = [
         "PermissionRequest": "permission", "PreToolUse": "clear", "PostToolUse": "clear", "Stop": "clear", "UserPromptSubmit": "clear",
+        "SessionEnd": "clear", "Notification": "clear",
     ]
 
     static func hooksInstalled(_ s: [String: Any]) -> Bool {

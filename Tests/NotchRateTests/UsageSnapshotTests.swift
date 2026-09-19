@@ -46,6 +46,18 @@ import Testing
         #expect(Notifier.crossings(old: nil, new: new) == ["Session usage reached 85%", "Session usage reached 100%"])
         #expect(Notifier.crossings(old: new, new: new).isEmpty)
     }
+
+    @Test func notificationResets() throws {
+        var old = try UsageSnapshot.decoder.decode(UsageSnapshot.self, from: Self.sample)
+        var new = old
+        old.sessionUsedPct = 90; new.sessionUsedPct = 0
+        #expect(Notifier.resets(old: old, new: new) == ["Session limit reset"])
+        old.sessionUsedPct = 50
+        #expect(Notifier.resets(old: old, new: new).isEmpty)  // never near the limit: silent
+        old.sessionUsedPct = 90; new.sessionUsedPct = 40
+        #expect(Notifier.resets(old: old, new: new).isEmpty)  // a dip, not a rollover
+        #expect(Notifier.resets(old: nil, new: new).isEmpty)
+    }
 }
 
 @Suite @MainActor struct HistoryTests {
