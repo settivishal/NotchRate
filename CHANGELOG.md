@@ -4,6 +4,21 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-09-19
+
+### Added
+- Side blobs merge into the notch like liquid (blur + alpha threshold) when the card opens and pop back out on close, with stretch, a reach-out from the notch and a soft bounce.
+- Claude Code activity blob: pulsing while a prompt is being answered, green check when done (persists until a terminal app comes to the front or you click it).
+- Permission requests are a blob with an expiry ring instead of the Allow/Deny island; hover opens the page. Caffeine and Claude blobs sit on opposite sides ("Caffeine blob on the left" setting).
+- Notification when a limit resets after it passed the first threshold (toggle in Settings).
+
+### Changed
+- Card width is constant: at least the badge plus blob room, so nothing resizes when a blob appears while the card is open.
+- Adapter tracks `busy-`/`done-` markers from UserPromptSubmit/Stop; `SessionEnd` and `Notification` hooks added (re-installed automatically on launch).
+
+### Fixed
+- Hovering the caffeine blob flickered the card open and closed.
+
 ## [0.6.0] — 2026-09-17
 
 ### Added
