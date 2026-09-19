@@ -66,6 +66,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self else { return }
             if let p = store.primary { History.append(p) }
             state?.tallCard = store.primary?.models?.isEmpty == false
+            let hit = store.primary.map { ($0.sessionUsedPct ?? 0) >= 100 || ($0.weeklyUsedPct ?? 0) >= 100 } ?? false
+            if hit != state?.limitHit { state?.limitHit = hit; fitCollapsed() }
             updateVisibility(screen: tracker?.current)
         }
         poller = UsagePoller(directory: store.directory)
@@ -76,7 +78,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         state = NotchState(geometry: NotchGeometry(screen: NSScreen.main ?? NSScreen.screens[0]))
-        state.onCaffeineChange = { [weak self] in self?.fitCollapsed() }
+        state.onBlobChange = { [weak self] in self?.fitCollapsed() }
         panel = NotchPanel()
         panel.contentView = NSHostingView(rootView: NotchView(store: store, state: state,
                                                               setExpanded: { [weak self] in self?.setExpanded($0) },

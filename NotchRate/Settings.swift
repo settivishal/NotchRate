@@ -13,7 +13,7 @@ enum Pref {
     static let cardRadius = "cardRadius"       // Double points, default 28: expanded card corner radius
     static let badgeCountdown = "badgeCountdown" // Bool, default false: badge shows time to reset instead of %
     static let badgeRing = "badgeRing"         // Bool, default false: tiny arc instead of the dot
-    static let blobLeft = "blobLeft"           // Bool, default false: caffeine blob sits left of the notch
+    static let blobLeft = "blobLeft"           // Bool, default false: timer blobs sit left of the notch
     static let menuBarText = "menuBarText"     // Bool, default false: menu bar shows "5h 42%" instead of icon
     static let warnPct = "warnPct"             // Double, default 85: first notification threshold
     static let fullPct = "fullPct"             // Double, default 100: second notification threshold
@@ -78,7 +78,7 @@ struct SettingsView: View {
                 Toggle("Show weekly (7d) in badge", isOn: $showWeekly)
                 Toggle("Time to reset instead of %", isOn: $badgeCountdown)
                 Toggle("Ring instead of dot", isOn: $badgeRing)
-                Toggle("Caffeine blob on the left", isOn: $blobLeft)
+                Toggle("Timer blobs (Caffeinate, Focus) on the left", isOn: $blobLeft)
                 Toggle("Follow mouse to every display (pill on plain displays)", isOn: $allDisplays)
                 Slider(value: $wingWidth, in: 30...120, step: 2) { Text("Badge width beside notch: \(Int(wingWidth))pt") }
             }

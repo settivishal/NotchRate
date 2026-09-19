@@ -3,26 +3,34 @@ import SwiftUI
 
 /// Bottom bar categories. Each owns one or more pages; swipe moves within a tab.
 enum Tab: CaseIterable {
-    case claude, caffeine
-    var title: String { self == .claude ? "Claude" : "Caffeinate" }
+    case claude, caffeine, focus
+    var title: String {
+        switch self {
+        case .claude: "Claude"
+        case .caffeine: "Caffeinate"
+        case .focus: "Focus"
+        }
+    }
     var icon: String {
         switch self {
         case .claude: "gauge.with.dots.needle.33percent"
         case .caffeine: "cup.and.saucer.fill"
+        case .focus: "timer"
         }
     }
     var pages: [Page] { Page.allCases.filter { $0.tab == self && $0 != .approval } }  // approval page is opened by a request, never navigated to
 }
 
 enum Page: CaseIterable {
-    case overview, trends, week, caffeine, approval
-    var tab: Tab { self == .caffeine ? .caffeine : .claude }
+    case overview, trends, week, caffeine, focus, approval
+    var tab: Tab { self == .caffeine ? .caffeine : self == .focus ? .focus : .claude }
     var title: String {
         switch self {
         case .overview: "Overview"
         case .trends: "Trends"
         case .week: "Week"
         case .caffeine: "Caffeinate"
+        case .focus: "Focus"
         case .approval: "Approval"
         }
     }
@@ -40,27 +48,46 @@ final class NotchState {
     var approval: Approvals.Request?  // side blob with a countdown ring while set; hover opens the Allow/Deny page
     var busy = false                  // Claude Code is working on a prompt: pulsing blob
     var done = false                  // it finished and the terminal has not been opened since: check blob
-    var sideBlobs: Bool { caffeinated || approval != nil || busy || done }  // collapsed window widens for them
+    var limitHit = false              // a rate-limit bucket is at 100%: red blob counting down to the reset
+    var sideBlobs: Bool { caffeinated || focusing || approval != nil || busy || done || limitHit }  // collapsed window widens for them
     /// nil = off, .distantFuture = until turned off, else auto-off at that time.
     var caffeineUntil: Date? {
         didSet {
             Caffeine.on = caffeinated
             if caffeinated != (oldValue != nil) { caffeineStarted = .now }
-            onCaffeineChange?()
-            caffeineTimer?.cancel()
-            guard let until = caffeineUntil, until != .distantFuture else { return }
-            caffeineTimer = Task { [weak self] in
-                try? await Task.sleep(until: .now + .seconds(until.timeIntervalSinceNow))
-                guard !Task.isCancelled else { return }
-                self?.caffeineUntil = nil
-            }
+            onBlobChange?()
+            schedule(&caffeineTimer, until: caffeineUntil) { $0.caffeineUntil = nil }
         }
     }
     var caffeinated: Bool { caffeineUntil != nil }
     var caffeineStarted = Date.now  // ring progress = remaining / (until - started)
-    var onCaffeineChange: (() -> Void)?  // collapsed window width changes with the blob
+    /// Pomodoro-style focus timer; notifies when it runs out.
+    var focusUntil: Date? {
+        didSet {
+            if focusing != (oldValue != nil) { focusStarted = .now }
+            onBlobChange?()
+            schedule(&focusTimer, until: focusUntil) { s in
+                s.focusUntil = nil
+                Notifier.post(title: "Focus", body: "\(Int(s.focusStarted.distance(to: .now) / 60)) min done — take a break")
+            }
+        }
+    }
+    var focusing: Bool { focusUntil != nil }
+    var focusStarted = Date.now
+    var onBlobChange: (() -> Void)?  // collapsed window width changes with the blobs
     private var caffeineTimer: Task<Void, Never>?
+    private var focusTimer: Task<Void, Never>?
     init(geometry: NotchGeometry) { self.geometry = geometry }
+
+    private func schedule(_ timer: inout Task<Void, Never>?, until: Date?, _ fire: @escaping @MainActor (NotchState) -> Void) {
+        timer?.cancel()
+        guard let until, until != .distantFuture else { return }
+        timer = Task { [weak self] in
+            try? await Task.sleep(until: .now + .seconds(until.timeIntervalSinceNow))
+            guard !Task.isCancelled, let self else { return }
+            fire(self)
+        }
+    }
 }
 
 struct NotchView: View {
@@ -102,20 +129,23 @@ struct NotchView: View {
         let size = state.expanded ? geo.expandedSize(for: state.page, tall: state.tallCard, plan: state.approval?.isPlan == true)
                                   : geo.collapsedSize(blob: blobSlack)
         // 1 s ticks only while something counts down (approval expiry, caffeine ring/timer).
-        TimelineView(.periodic(from: .now, by: state.approval == nil && !state.caffeinated ? 60 : 1)) { ctx in
-            // Caffeine blob on one side (setting), Claude activity (approval, else busy, else done) on the other.
-            // A side is "merged" (1) while its blob is absent or the card is open.
-            let claude = state.approval != nil || state.busy || state.done
+        TimelineView(.periodic(from: .now, by: state.approval == nil && !state.caffeinated && !state.focusing ? 60 : 1)) { ctx in
+            // Timer blob (focus, else caffeine) on one side (setting), Claude activity (approval, else limit,
+            // else busy, else done) on the other. A side is "merged" (1) while its blob is absent or the card is open.
+            let claude = state.approval != nil || state.limitHit || state.busy || state.done
+            let timer = state.focusing || state.caffeinated
             let claudeMerge: CGFloat = state.expanded || !claude ? 1 : 0
-            let caffeineMerge: CGFloat = state.expanded || !state.caffeinated ? 1 : 0
+            let caffeineMerge: CGFloat = state.expanded || !timer ? 1 : 0
             let shape = NotchShape(topRadius: geo.hasNotch ? 6 : 0, bottomRadius: state.expanded ? cardRadius : 12)
             ZStack(alignment: .top) {
                 GooBody(shape: shape, blob: geo.blobWidth, gap: NotchGeometry.blobGap, slack: blobSlack, reach: state.expanded ? 1 : 0,
                         left: blobLeft ? caffeineMerge : claudeMerge, right: blobLeft ? claudeMerge : caffeineMerge)
                     .animation(gooAnimation, value: [claudeMerge, caffeineMerge])
                     .animation(gooAnimation, value: state.expanded)
-                if state.caffeinated { sideBlob(leading: blobLeft) { caffeineBlob(now: ctx.date) } }
+                if state.focusing { sideBlob(leading: blobLeft) { focusBlob(now: ctx.date) } }
+                else if state.caffeinated { sideBlob(leading: blobLeft) { caffeineBlob(now: ctx.date) } }
                 if let r = state.approval { sideBlob(leading: !blobLeft) { approvalBlob(r, now: ctx.date) } }
+                else if state.limitHit, let snap = store.primary { sideBlob(leading: !blobLeft) { limitBlob(snap, now: ctx.date) } }
                 else if state.busy { sideBlob(leading: !blobLeft) { busyBlob } }
                 else if state.done { sideBlob(leading: !blobLeft) { doneBlob } }
                 if state.expanded {
@@ -132,6 +162,7 @@ struct NotchView: View {
                         case .overview, .trends, .week:
                             Text("No usage data yet").font(.caption).foregroundStyle(.secondary).frame(maxHeight: .infinity)
                         case .caffeine: caffeinePage(now: ctx.date)
+                        case .focus: focusPage(now: ctx.date)
                         case .approval: approvalPage(now: ctx.date)
                         }
                     }
@@ -140,8 +171,8 @@ struct NotchView: View {
                 }
             }
             .frame(width: size.width, height: size.height)
-            .contentShape(HoverArea(inset: !state.expanded && blobSlack && !(state.caffeinated && claude) ? geo.blobWidth + NotchGeometry.blobGap : 0,
-                                    mirrorOnLeft: state.caffeinated ? !blobLeft : blobLeft))  // skip the empty strip mirroring a lone blob
+            .contentShape(HoverArea(inset: !state.expanded && blobSlack && !(timer && claude) ? geo.blobWidth + NotchGeometry.blobGap : 0,
+                                    mirrorOnLeft: timer ? !blobLeft : blobLeft))  // skip the empty strip mirroring a lone blob
             .pointerStyle(.default)  // no I-beam over labels
             .animation(state.sideBlobs && state.expanded ? animation.delay(0.1) : animation, value: state.expanded)  // blobs land first, then the card grows
             .animation(animation, value: state.page)
@@ -197,7 +228,7 @@ struct NotchView: View {
             Circle().stroke(tint.opacity(0.25), lineWidth: 2.5)
             Circle().trim(from: 0, to: progress)
                 .stroke(tint, style: StrokeStyle(lineWidth: 2.5, lineCap: .round)).rotationEffect(.degrees(-90))
-            Image(systemName: icon).resizable().scaledToFit().frame(width: state.geometry.blobWidth * 0.38).foregroundStyle(tint)
+            Image(systemName: icon).resizable().scaledToFit().frame(width: state.geometry.blobWidth * 0.24).foregroundStyle(tint)
         }
     }
 
@@ -209,15 +240,30 @@ struct NotchView: View {
             .onTapGesture { setPage(.approval); setExpanded(true) }
     }
 
+    private func focusBlob(now: Date) -> some View {
+        let progress = state.focusUntil.map { max(0, min(1, $0.timeIntervalSince(now) / $0.timeIntervalSince(state.focusStarted))) } ?? 0
+        return ringBlob(progress: progress, icon: "timer", tint: .indigo)
+            .onTapGesture { setPage(.focus); setExpanded(true) }
+    }
+
+    /// A bucket is at 100%: ring drains as its window runs out.
+    private func limitBlob(_ snap: UsageSnapshot, now: Date) -> some View {
+        let session = (snap.sessionUsedPct ?? 0) >= 100
+        let resets = (session ? snap.sessionResetsAt : snap.weeklyResetsAt) ?? now.timeIntervalSince1970
+        let progress = max(0, min(1, (resets - now.timeIntervalSince1970) / (session ? 5 * 3600 : 7 * 86400)))
+        return ringBlob(progress: progress, icon: "hourglass", tint: .red)
+            .onTapGesture { setPage(.overview); setExpanded(true) }
+    }
+
     private var busyBlob: some View {
-        Image(systemName: "sparkles").resizable().scaledToFit().frame(width: state.geometry.blobWidth * 0.42)
+        Image(systemName: "sparkles").resizable().scaledToFit().frame(width: state.geometry.blobWidth * 0.28)
             .foregroundStyle(.white).symbolEffect(.pulse)
             .onTapGesture { setPage(.overview); setExpanded(true) }
     }
 
     /// Persists until a terminal app comes to the front (or a click).
     private var doneBlob: some View {
-        Image(systemName: "checkmark").resizable().scaledToFit().frame(width: state.geometry.blobWidth * 0.36)
+        Image(systemName: "checkmark").resizable().scaledToFit().frame(width: state.geometry.blobWidth * 0.24)
             .fontWeight(.bold).foregroundStyle(.green)
             .onTapGesture { clearDone() }
     }
@@ -271,9 +317,10 @@ struct NotchView: View {
     private var tabBar: some View {
         HStack(spacing: 8) {
             ForEach(Tab.allCases, id: \.self) { t in
-                let awake = t == .caffeine && state.caffeinated  // glows on every tab so the state is visible from Claude too
-                NavButton(icon: t.icon, label: t.title, large: true, tint: awake ? .orange : state.page.tab == t ? .white : nil) { setPage(t.pages[0]) }
-                    .shadow(color: awake ? .orange.opacity(0.8) : .clear, radius: 6)
+                // Running timers glow on every tab so the state is visible from Claude too.
+                let glow: Color? = t == .caffeine && state.caffeinated ? .orange : t == .focus && state.focusing ? .indigo : nil
+                NavButton(icon: t.icon, label: t.title, large: true, tint: glow ?? (state.page.tab == t ? .white : nil)) { setPage(t.pages[0]) }
+                    .shadow(color: glow?.opacity(0.8) ?? .clear, radius: 6)
             }
         }
         .padding(.top, 12)
@@ -289,23 +336,34 @@ struct NotchView: View {
             .onTapGesture { setPage(.caffeine); setExpanded(true) }
     }
 
-    private static let presets: [(String, TimeInterval)] = [("30m", 1800), ("1h", 3600), ("2h", 7200), ("∞", .infinity)]
-
     private func caffeinePage(now: Date) -> some View {
+        timerPage(now: now, until: state.caffeineUntil, tint: .orange, offIcon: "moon",
+                  status: state.caffeinated ? "Mac stays awake" : "sleeping normally",
+                  presets: [("30m", 1800), ("1h", 3600), ("2h", 7200), ("∞", .infinity)]) { state.caffeineUntil = $0 }
+    }
+
+    private func focusPage(now: Date) -> some View {
+        timerPage(now: now, until: state.focusUntil, tint: .indigo, offIcon: "stop.fill",
+                  status: state.focusing ? "focusing · notifies when done" : "idle",
+                  presets: [("15m", 900), ("25m", 1500), ("45m", 2700), ("1h", 3600)]) { state.focusUntil = $0 }
+    }
+
+    /// Big countdown (∞ for "until turned off") over an Off button and duration presets.
+    private func timerPage(now: Date, until: Date?, tint: Color, offIcon: String, status: String,
+                           presets: [(String, TimeInterval)], set: @escaping (Date?) -> Void) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            header { Text(state.caffeinated ? "Mac stays awake" : "sleeping normally") }
-            // Big countdown in the middle; ∞ for "until turned off".
-            Text(state.caffeineUntil.map { $0 == .distantFuture ? "∞" : countdown($0, now: now) } ?? "OFF")
+            header { Text(status) }
+            Text(until.map { $0 == .distantFuture ? "∞" : countdown($0, now: now) } ?? "OFF")
                 .font(.system(size: 32, weight: .bold, design: .rounded)).monospacedDigit()
-                .foregroundStyle(state.caffeinated ? .orange : .gray)
+                .foregroundStyle(until != nil ? tint : .gray)
                 .frame(maxWidth: .infinity)
                 .padding(.top, 2)
             HStack(spacing: 8) {
-                NavButton(icon: "moon", label: "Off", large: true, tint: state.caffeinated ? nil : .white) { state.caffeineUntil = nil }
-                ForEach(Self.presets, id: \.0) { name, secs in
+                NavButton(icon: offIcon, label: "Off", large: true, tint: until == nil ? .white : nil) { set(nil) }
+                ForEach(presets, id: \.0) { name, secs in
                     let target: Date = secs.isInfinite ? .distantFuture : now.addingTimeInterval(secs)
-                    let selected = state.caffeineUntil.map { secs.isInfinite ? $0 == .distantFuture : abs($0.timeIntervalSince(target)) < 60 } ?? false
-                    NavButton(label: name, large: true, tint: selected ? .orange : nil) { state.caffeineUntil = target }
+                    let selected = until.map { secs.isInfinite ? $0 == .distantFuture : abs($0.timeIntervalSince(target)) < 60 } ?? false
+                    NavButton(label: name, large: true, tint: selected ? tint : nil) { set(target) }
                 }
             }
             .frame(maxWidth: .infinity)
@@ -587,6 +645,8 @@ struct NotchView: View {
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .onTapGesture { setPage(.trends) }
     }
 
     private func bar(_ title: String, _ pct: Double?, resets: Double?, now: Date) -> some View {

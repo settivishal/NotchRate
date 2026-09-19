@@ -4,6 +4,16 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.8.0] — 2026-09-19
+
+### Added
+- Focus tab: Pomodoro timer (15m / 25m / 45m / 1h) with a countdown blob and a notification when it ends.
+- Limit blob: red hourglass draining toward the reset while session or weekly usage is at 100 %.
+- Clicking a gauge on Overview opens Trends.
+
+### Changed
+- Blob icons are smaller.
+
 ## [0.7.0] — 2026-09-19
 
 ### Added

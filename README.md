@@ -38,6 +38,7 @@ Collapsed: dot + session %, merged with the notch (a pill at the top of the menu
 | **Claude · Trends** | 5h and 7d charts, burn rate, "full in ~Xh", usage this window, today's / average daily usage, projected weekly at reset |
 | **Claude · Week** | Per-day bars of weekly limit consumed, sessions started, peak session %, limit hits, CLI cost for the week |
 | **Caffeinate** | Keep the Mac awake for 30m / 1h / 2h / until turned off; auto-off when the timer ends; a countdown blob sits beside the badge while awake |
+| **Focus** | Pomodoro timer: 15m / 25m / 45m / 1h, countdown blob while running, notification when it ends |
 
 The icon bar under the notch (or a two-finger swipe) switches categories; pills in the header move between a category's pages.
 
@@ -48,6 +49,7 @@ The icon bar under the notch (or a two-finger swipe) switches categories; pills 
 Activity shows as small circles beside the badge, iOS Dynamic Island style: they pop out of the notch, melt back into it when the card opens, and sit on either side (Caffeinate on one, Claude Code on the other; pick the side in Settings).
 
 - **Working** — a pulsing sparkle while Claude Code is answering a prompt.
+- **Limit hit** — a red hourglass draining toward the reset while a bucket sits at 100 %.
 - **Done** — a green check when it finishes; stays until you bring a terminal to the front (iTerm, Terminal, Ghostty, Warp, kitty, Alacritty, WezTerm, VS Code, Cursor) or click it.
 - **Approval** — when Claude Code stops for a permission, a shield with a countdown ring appears and hovering opens the **Allow / Deny** page; the answer goes straight back through the `PermissionRequest` hook. When Claude presents a plan, read it and pick the same options the terminal offers: **Auto-accept edits**, **Ask on edits** or **Keep planning**. Tool prompts wait 15 s on the notch, plans 90 s; after that the blob greys out, the usual terminal prompt appears and the blob clears itself once you answer there.
 
@@ -131,7 +133,7 @@ Menu bar gauge icon → **Settings…**
 | Mark offline after | 2 h | 0.5–12 h without an update |
 | Warn at / Alert at | 85 % / 100 % | Notification thresholds per bucket |
 | Pace warning | on | Once per session window when the burn rate reaches 100 % before reset |
-| Caffeine blob on the left | off | Swaps the sides of the Caffeinate and Claude Code blobs |
+| Timer blobs on the left | off | Swaps the sides of the timer (Caffeinate, Focus) and Claude Code blobs |
 | Notify when a limit resets | on | After a bucket passed the first threshold and rolled over |
 | Allow/Deny on the notch | on | Permission prompts appear as a blob for 15 s before the terminal takes over |
 | Plans on the notch | on | Notification + approve/keep-planning from the card when Claude Code presents a plan |
