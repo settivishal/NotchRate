@@ -17,7 +17,7 @@ struct NotchRateApp: App {
             Button("Settings…") { NSApp.activate(); openSettings() }
             Button("Quit NotchRate") { NSApp.terminate(nil) }
         } label: {
-            if menuBarText { Text(delegate.summary) } else { Image(systemName: "gauge.with.dots.needle.33percent") }
+            if menuBarText { Text(delegate.summary) } else { Image(nsImage: Brand.glyph).resizable().frame(width: 13, height: 13) }
         }
         Settings { SettingsView() }
     }
@@ -29,6 +29,29 @@ struct NotchRateApp: App {
         a.informativeText = "Restart Claude Code to start receiving cost and context data."
         a.runModal()
     }
+}
+
+enum Brand {
+    /// Template glyph: bold N with the notch bitten out of its top, dot inside the bite. Drawn as vectors on an
+    /// 18pt grid with whole-point edges, so it re-renders crisp at every menu bar scale.
+    static let glyph: NSImage = {
+        let img = NSImage(size: NSSize(width: 18, height: 18), flipped: true) { _ in
+            guard let cg = NSGraphicsContext.current?.cgContext else { return false }
+            let n = CGMutablePath()
+            n.addLines(between: [CGPoint(x: 2, y: 1), CGPoint(x: 6, y: 1), CGPoint(x: 12, y: 10), CGPoint(x: 12, y: 1), CGPoint(x: 16, y: 1),
+                                 CGPoint(x: 16, y: 17), CGPoint(x: 12, y: 17), CGPoint(x: 6, y: 8), CGPoint(x: 6, y: 17), CGPoint(x: 2, y: 17)])
+            n.closeSubpath()
+            cg.setFillColor(.black)
+            cg.addPath(n); cg.fillPath()
+            cg.setBlendMode(.destinationOut)
+            cg.addPath(CGPath(roundedRect: CGRect(x: 5, y: -2, width: 8, height: 8.5), cornerWidth: 1.5, cornerHeight: 1.5, transform: nil)); cg.fillPath()
+            cg.setBlendMode(.normal)
+            cg.fillEllipse(in: CGRect(x: 6.5, y: 2, width: 2.5, height: 2.5))
+            return true
+        }
+        img.isTemplate = true
+        return img
+    }()
 }
 
 @MainActor

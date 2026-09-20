@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/logo.svg" alt="NotchRate" width="600">
+  <img src="docs/logo.svg" alt="NotchRate" width="720">
 </p>
 
 <p align="center">

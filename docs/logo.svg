@@ -1,9 +1,14 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="720" height="160" viewBox="0 0 720 160">
-  <rect width="720" height="160" rx="24" fill="#0b0b0c"/>
-  <!-- notch with wings -->
-  <path d="M190 0 H530 Q530 0 530 8 V44 Q530 60 514 60 H206 Q190 60 190 44 V8 Q190 0 190 0 Z" fill="#000"/>
-  <circle cx="214" cy="30" r="7" fill="#34c759"/>
-  <text x="506" y="36" font-family="-apple-system, SF Pro Rounded, Helvetica, Arial" font-size="18" font-weight="600" fill="#fff" text-anchor="end">42%</text>
-  <text x="360" y="118" font-family="-apple-system, SF Pro Display, Helvetica, Arial" font-size="40" font-weight="700" fill="#fff" text-anchor="middle">NotchRate</text>
-  <text x="360" y="146" font-family="-apple-system, SF Pro Text, Helvetica, Arial" font-size="15" fill="#9a9a9f" text-anchor="middle">Claude usage limits, in the notch</text>
+<svg xmlns="http://www.w3.org/2000/svg" width="720" height="200" viewBox="0 0 720 200">
+  <defs><linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2a2a2d"/><stop offset="1" stop-color="#0a0a0b"/></linearGradient></defs>
+  <rect width="720" height="200" rx="28" fill="#0b0b0c"/>
+  <!-- app icon -->
+  <g transform="translate(96 20) scale(0.3125)">
+    <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+    <path d="M136 416 V136 L376 416 V136" fill="none" stroke="#fff" stroke-width="70" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M152 0 H360 V136 Q360 166 330 166 H182 Q152 166 152 136 Z" fill="#000"/>
+    <circle cx="200" cy="106" r="15" fill="#34c759"/>
+    <rect x="262" y="94" width="58" height="24" rx="12" fill="#fff" fill-opacity="0.85"/>
+  </g>
+  <text x="284" y="104" font-family="-apple-system, SF Pro Display, Helvetica, Arial" font-size="56" font-weight="700" fill="#fff">NotchRate</text>
+  <text x="286" y="142" font-family="-apple-system, SF Pro Text, Helvetica, Arial" font-size="18" fill="#9a9a9f">Claude usage, timers and approvals, in the notch</text>
 </svg>

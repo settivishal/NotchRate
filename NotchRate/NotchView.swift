@@ -325,6 +325,12 @@ struct NotchView: View {
         }
         .padding(.top, 12)
         .padding(.bottom, 12)
+        .frame(maxWidth: .infinity)
+        .overlay(alignment: .leading) {  // logo in the corner, aligned with the page margin
+            Image(nsImage: Brand.glyph).renderingMode(.template).resizable().scaledToFit().frame(height: 16)
+                .foregroundStyle(.white.opacity(0.85))
+                .padding(.leading, 22)
+        }
     }
 
     /// Orange ring counts down the caffeine timer, cup inside.

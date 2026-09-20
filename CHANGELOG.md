@@ -4,6 +4,11 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.8.1] — 2026-09-19
+
+### Added
+- App icon and logo: an N with the notch bitten out of its top. Icon ships in the bundle, the same glyph sits in the menu bar (vector, drawn in code) and in the corner of the expanded card.
+
 ## [0.8.0] — 2026-09-19
 
 ### Added

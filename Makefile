@@ -8,7 +8,7 @@ app: build
 	rm -rf $(APP); mkdir -p $(APP)/Contents/MacOS
 	cp .build/release/NotchRate $(APP)/Contents/MacOS/
 	cp Info.plist $(APP)/Contents/
-	mkdir -p $(APP)/Contents/Resources && cp adapters/claude-code.sh $(APP)/Contents/Resources/
+	mkdir -p $(APP)/Contents/Resources && cp adapters/claude-code.sh Resources/* $(APP)/Contents/Resources/
 	codesign --force --sign - $(APP)
 
 run: app
