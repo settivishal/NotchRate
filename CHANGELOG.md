@@ -4,6 +4,27 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.9.0] — 2026-09-24
+
+### Added
+- Claude · Spend page: what your Claude Code tokens would cost at API list prices (today, 7 days, 30 days), top models and projects, cache hit share and a 13-week activity map. Read locally and incrementally from Claude Code's own transcripts in `~/.claude/projects`; only token counts, model, time and project folder are used.
+- "Claude finished" notification for turns longer than a chosen time (off, always, 30 s – 5 min; default 1 min), skipped while a terminal is in front.
+- The working blob counts up the turn's elapsed time.
+- Card size presets: Compact, Spacious (1.25×) and Custom (100–160 %), previewed live.
+- Option to hide the badge while an app is full screen; it also hides while the screen is locked or asleep.
+- Haptic tap when hover opens the card (Force Touch trackpads, on by default).
+- Hairline outline on the open card with Increase Contrast.
+
+### Changed
+- The island animates with Core Animation: the silhouette springs open and closed on the render server while the card is laid out once at its final size, and content fades in once the shape is mostly open. Corners grow continuously with the height.
+- Hover opens after the delay and closes 0.18 s after leaving, both re-checked against where the card is heading, so edges no longer flicker. A card closed by click or hotkey stays closed until the pointer leaves.
+- Even 16 pt margin on the card's sides and bottom; Compact card is 380 pt wide.
+- First click on a card button works while another app is in front; our menu bar menu closes the card.
+
+### Fixed
+- A card could close right after opening on a fresh launch (a system defaults write was treated as a settings change).
+- History: the first row written to a new history file was missing its newline, so the next row merged into it and both were lost.
+
 ## [0.8.1] — 2026-09-19
 
 ### Added

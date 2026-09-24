@@ -37,6 +37,7 @@ Collapsed: dot + session %, merged with the notch (a pill at the top of the menu
 | **Claude · Overview** | Session and weekly ring gauges (or bars) with reset countdowns, CLI cost, context window %, extra-usage % when enabled, refresh, pin, link to claude.ai usage |
 | **Claude · Trends** | 5h and 7d charts, burn rate, "full in ~Xh", usage this window, today's / average daily usage, projected weekly at reset |
 | **Claude · Week** | Per-day bars of weekly limit consumed, sessions started, peak session %, limit hits, CLI cost for the week |
+| **Claude · Spend** | What your Claude Code tokens would cost at API list prices (today / 7 days / 30 days), top models and projects, cache hit share, 13-week activity map |
 | **Caffeinate** | Keep the Mac awake for 30m / 1h / 2h / until turned off; auto-off when the timer ends; a countdown blob sits beside the badge while awake |
 | **Focus** | Pomodoro timer: 15m / 25m / 45m / 1h, countdown blob while running, notification when it ends |
 
@@ -48,7 +49,7 @@ The icon bar under the notch (or a two-finger swipe) switches categories; pills 
 
 Activity shows as small circles beside the badge, iOS Dynamic Island style: they pop out of the notch, melt back into it when the card opens, and sit on either side (Caffeinate on one, Claude Code on the other; pick the side in Settings).
 
-- **Working** — a pulsing sparkle while Claude Code is answering a prompt.
+- **Working** — the elapsed time of the turn while Claude Code is answering a prompt. Turns longer than a set time (default 1 min) end with a "Claude finished" notification unless a terminal is in front.
 - **Limit hit** — a red hourglass draining toward the reset while a bucket sits at 100 %.
 - **Done** — a green check when it finishes; stays until you bring a terminal to the front (iTerm, Terminal, Ghostty, Warp, kitty, Alacritty, WezTerm, VS Code, Cursor) or click it.
 - **Approval** — when Claude Code stops for a permission, a shield with a countdown ring appears and hovering opens the **Allow / Deny** page; the answer goes straight back through the `PermissionRequest` hook. When Claude presents a plan, read it and pick the same options the terminal offers: **Auto-accept edits**, **Ask on edits** or **Keep planning**. Tool prompts wait 15 s on the notch, plans 90 s; after that the blob greys out, the usual terminal prompt appears and the blob clears itself once you answer there.
@@ -126,9 +127,13 @@ Menu bar gauge icon → **Settings…**
 | Ring instead of dot | off | 10 pt arc of session usage |
 | Expanded gauges | rings | Rings or bars on the Overview page |
 | Follow mouse to every display | on | Off = notch screen only; plain displays get a pill |
-| Hover delay | 0.3 s | 0–1 s |
+| Hover delay | 0.15 s | 0–1 s; closing waits 0.18 s after the pointer leaves |
 | Badge width beside notch | 44 pt | 30–120 pt |
 | Card corner radius | 28 pt | 8–48 pt, previews live while dragging |
+| Card size | Compact | Compact (380 pt), Spacious (1.25×) or Custom (100–160 %); wider card, taller charts |
+| Haptic tap when the card opens | on | Force Touch trackpads |
+| Hide while an app is full screen | off | Also always hidden while the screen is locked or asleep |
+| Notify when a task finishes | after 1 m | Off, always, or after 30 s / 1 m / 2 m / 5 m |
 | Poll usage every | 60 s | 30 s – 10 min |
 | Mark offline after | 2 h | 0.5–12 h without an update |
 | Warn at / Alert at | 85 % / 100 % | Notification thresholds per bucket |
@@ -143,6 +148,7 @@ Menu bar gauge icon → **Settings…**
 - **Network:** one `GET` to `api.anthropic.com/api/oauth/usage` per poll interval, plus a token refresh `POST` to `console.anthropic.com` when the token has expired. Nothing else. No telemetry, no third-party servers.
 - **Keychain:** reads the `Claude Code-credentials` item via the `security` CLI (already on that item's ACL, so no prompt). Writes back only after a token refresh, preserving every other field.
 - **Disk:** `~/.notch-usage/` holds the normalized snapshot and the history log. Both are plain JSON you can delete at any time.
+- **Claude Code transcripts:** the Spend page reads `~/.claude/projects/**/*.jsonl` on your Mac, keeping only token counts, model, time and project folder in memory. Message content is never stored or sent anywhere.
 - **Endpoint stability:** the OAuth usage endpoint is undocumented; if it changes, the badge falls back to status-line data and goes "offline" between CLI turns.
 
 See [SECURITY.md](SECURITY.md) for reporting.
