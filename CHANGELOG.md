@@ -4,6 +4,13 @@ All notable changes to this project are documented here. Format follows [Keep a 
 
 ## [Unreleased]
 
+## [0.9.1] — 2026-09-24
+
+### Added
+- Alerts grow out of the notch as a one-row banner for 5 s (limit thresholds, resets, pace, Focus done, Claude finished, daily budget). Click opens the matching page. macOS notifications take over while the card is open, the badge is hidden, or with "Show alerts on the notch" off.
+- "Claude finished" shows the project, duration, API-value cost and output tokens of the turn.
+- Daily budget (off, $5 – $250 of API value): one warning a day when today's spend passes it.
+
 ## [0.9.0] — 2026-09-24
 
 ### Added

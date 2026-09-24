@@ -56,7 +56,7 @@ Activity shows as small circles beside the badge, iOS Dynamic Island style: they
 
 All of it is wired by **Connect Claude Code status line…** (adds `hooks` entries next to `statusLine` in `~/.claude/settings.json`).
 
-Badge colors: green under 60 %, yellow 60–85 %, red above. Greyed out ("offline") when no update arrives for 2 h. Notifications fire when session or weekly usage crosses 85 % and 100 %.
+Badge colors: green under 60 %, yellow 60–85 %, red above. Greyed out ("offline") when no update arrives for 2 h. Alerts fire when session or weekly usage crosses 85 % and 100 %, when a limit resets, when Claude finishes a long turn ("NotchRate · 4m 12s · $0.82 · 18k out") and when a daily budget is passed. They grow out of the notch as a short banner (click opens the matching page); macOS notifications take over while the card is open or the badge is hidden.
 
 ## Install
 
@@ -134,6 +134,8 @@ Menu bar gauge icon → **Settings…**
 | Haptic tap when the card opens | on | Force Touch trackpads |
 | Hide while an app is full screen | off | Also always hidden while the screen is locked or asleep |
 | Notify when a task finishes | after 1 m | Off, always, or after 30 s / 1 m / 2 m / 5 m |
+| Show alerts on the notch | on | Banner from the notch instead of a macOS notification when the island is visible |
+| Daily budget (API value) | off | $5 – $250; one warning a day when today's Spend total passes it |
 | Poll usage every | 60 s | 30 s – 10 min |
 | Mark offline after | 2 h | 0.5–12 h without an update |
 | Warn at / Alert at | 85 % / 100 % | Notification thresholds per bucket |
