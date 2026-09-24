@@ -4,7 +4,17 @@ import AppKit
 /// shape merges with it. No notch: a small pill hugging the menu bar.
 struct NotchGeometry {
     static var pillWidth: CGFloat { UserDefaults.standard.bool(forKey: Pref.showWeekly) ? 160 : 130 }
-    static var expandedSize: CGSize { CGSize(width: 356, height: UserDefaults.standard.bool(forKey: Pref.ringGauges) ? 122 : 150) }
+    /// Card size preset: 1 compact, 1.25 spacious, custom from the slider. Scales width and chart heights;
+    /// text keeps its size (a scale transform would blur it).
+    static var scale: CGFloat {
+        let d = UserDefaults.standard
+        return switch d.string(forKey: Pref.cardSize) {
+        case "spacious": 1.25
+        case "custom": min(1.6, max(0.9, d.double(forKey: Pref.cardScale)))
+        default: 1
+        }
+    }
+    static var expandedSize: CGSize { CGSize(width: 356 * scale, height: UserDefaults.standard.bool(forKey: Pref.ringGauges) ? 122 : 150) }
 
     let screen: NSScreen
     let hasNotch: Bool
@@ -45,9 +55,11 @@ struct NotchGeometry {
         let card = switch page {
         case .overview: CGSize(width: Self.expandedSize.width, height: Self.expandedSize.height + 24 + (tall ? 18 : 0))
         case .approval: CGSize(width: Self.expandedSize.width, height: plan ? 300 : 120)
-        case .trends: CGSize(width: Self.expandedSize.width, height: 280)
-        case .week: CGSize(width: Self.expandedSize.width, height: 240)
-        case .spend: CGSize(width: Self.expandedSize.width, height: 230)
+        // Charts grow with the scale: two 70pt charts on Trends, one 120pt on Week, the 68pt activity map on Spend
+        // (which only adds height once it outgrows the 98pt model/project lists beside it).
+        case .trends: CGSize(width: Self.expandedSize.width, height: 280 + 140 * (Self.scale - 1))
+        case .week: CGSize(width: Self.expandedSize.width, height: 240 + 120 * (Self.scale - 1))
+        case .spend: CGSize(width: Self.expandedSize.width, height: 230 + max(0, 68 * Self.scale - 98))
         case .caffeine, .focus: CGSize(width: Self.expandedSize.width, height: Self.expandedSize.height + 24)  // same as overview
         }
         return CGSize(width: max(card.width, collapsedSize(blob: true).width), height: topHeight + card.height + Self.tabBar + 4)  // +4: 16pt bottom margin (was 12)

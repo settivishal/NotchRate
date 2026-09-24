@@ -71,6 +71,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var pointerInside = false
     private let logs = LogReader()
     private var spendRead = Date.distantPast
+    private var flashTask: Task<Void, Never>?
     private var locked = false  // screen locked or displays asleep: nothing to show
     private var hoverSuppressed = false  // closed by click/hotkey with the pointer on it: no reopen until it leaves
     private var previewing = false
@@ -361,6 +362,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         previewing = on
         if on { updateVisibility(screen: tracker.current) }
         setExpanded(on)
+    }
+
+    /// A preset click has no drag to hold the preview open: show the card for a moment.
+    func flashPreview() {
+        flashTask?.cancel()
+        preview(true)
+        flashTask = Task {
+            try? await Task.sleep(for: .seconds(1.5))
+            guard !Task.isCancelled else { return }
+            preview(false)
+        }
     }
 
     func togglePin() {

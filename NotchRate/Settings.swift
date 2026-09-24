@@ -25,6 +25,8 @@ enum Pref {
     static let paceWarnedFor = "paceWarnedFor" // Double: session resets_at already warned about
     static let hideFullscreen = "hideFullscreen" // Bool, default false: hide the badge while an app is full screen on its display
     static let haptics = "haptics"             // Bool, default true: trackpad tap when hover opens the card
+    static let cardSize = "cardSize"           // String, default "compact": compact / spacious / custom card preset
+    static let cardScale = "cardScale"         // Double, default 1.25: custom preset scale, 0.9–1.6
     static let finishNotify = "finishNotify"   // Double seconds, default 60: notify when a Claude turn this long finishes; -1 off
 
     static func register() {
@@ -32,7 +34,7 @@ enum Pref {
             staleHours: 2.0, hoverDelay: 0.15, allDisplays: true, wingWidth: 44.0, showWeekly: false, hideBadge: false,
             ringGauges: true, pollSeconds: 60.0, cardRadius: 28.0, badgeCountdown: false, badgeRing: false, blobLeft: false,
             menuBarText: false, warnPct: 85.0, fullPct: 100.0, paceWarn: true, resetNotify: true, hotkey: true, planNotify: true, approvals: true,
-            hideFullscreen: false, haptics: true, finishNotify: 60.0,
+            hideFullscreen: false, cardSize: "compact", cardScale: 1.25, haptics: true, finishNotify: 60.0,
         ])
     }
     static var staleAfter: TimeInterval { UserDefaults.standard.double(forKey: staleHours) * 3600 }
@@ -63,6 +65,8 @@ struct SettingsView: View {
     @AppStorage(Pref.hideFullscreen) private var hideFullscreen = false
     @AppStorage(Pref.haptics) private var haptics = true
     @AppStorage(Pref.finishNotify) private var finishNotify = 60.0
+    @AppStorage(Pref.cardSize) private var cardSize = "compact"
+    @AppStorage(Pref.cardScale) private var cardScale = 1.25
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -91,6 +95,18 @@ struct SettingsView: View {
                 Slider(value: $wingWidth, in: 30...120, step: 2) { Text("Badge width beside notch: \(Int(wingWidth))pt") }
             }
             Section("Card") {
+                Picker("Size", selection: $cardSize) {
+                    Text("Compact").tag("compact")
+                    Text("Spacious").tag("spacious")
+                    Text("Custom").tag("custom")
+                }
+                .pickerStyle(.segmented)
+                .onChange(of: cardSize) { AppDelegate.shared?.flashPreview() }
+                if cardSize == "custom" {
+                    Slider(value: $cardScale, in: 0.9...1.6, step: 0.05) {
+                        Text("Scale: \(Int((cardScale * 100).rounded()))%")
+                    } onEditingChanged: { AppDelegate.shared?.preview($0) }
+                }
                 Toggle("Haptic tap when the card opens", isOn: $haptics)
                 Picker("Gauges", selection: $ringGauges) {
                     Text("Rings").tag(true)
@@ -122,6 +138,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 400, height: 820)
+        .frame(width: 400, height: 880)
     }
 }

@@ -133,6 +133,8 @@ struct NotchView: View {
     @AppStorage(Pref.badgeCountdown) private var badgeCountdown = false
     @AppStorage(Pref.badgeRing) private var badgeRing = false
     @AppStorage(Pref.blobLeft) private var blobLeft = false
+    @AppStorage(Pref.cardSize) private var cardSize = "compact"  // re-render on preset change
+    @AppStorage(Pref.cardScale) private var cardScale = 1.25
 
     var body: some View {
         Group {
@@ -591,7 +593,7 @@ struct NotchView: View {
                 AxisValueLabel { Text(ago(now.timeIntervalSince(v.as(Date.self)!))).font(.caption2).foregroundStyle(.gray) }
             }
         }
-        .frame(height: 70)
+        .frame(height: 70 * NotchGeometry.scale)
     }
 
     private func ago(_ secs: TimeInterval) -> String {
@@ -621,7 +623,7 @@ struct NotchView: View {
             }
             .chartXAxis { AxisMarks(values: .stride(by: .day)) { _ in AxisValueLabel(format: .dateTime.weekday(.narrow), centered: true) } }
             .chartYAxis(.hidden)
-            .frame(height: 120)
+            .frame(height: 120 * NotchGeometry.scale)
             Divider().overlay(.white.opacity(0.15))
             Group {
                 HStack {
@@ -713,7 +715,7 @@ struct NotchView: View {
                         let cost = daily[day] ?? 0
                         RoundedRectangle(cornerRadius: 2)
                             .fill(back < 0 ? .clear : cost > 0 ? Color.accentColor.opacity(0.25 + 0.75 * cost / peak) : .white.opacity(0.08))
-                            .frame(width: 8, height: 8)
+                            .frame(width: 8 * NotchGeometry.scale, height: 8 * NotchGeometry.scale)
                             .help(back < 0 ? "" : "\(day.formatted(.dateTime.month(.abbreviated).day())): \(cost.formatted(.currency(code: "USD")))")
                     }
                 }
