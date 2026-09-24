@@ -69,6 +69,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var blobChange = 0  // same, for blob pop-in completions
     private var hoverTask: Task<Void, Never>?
     private var pointerInside = false
+    private var locked = false  // screen locked or displays asleep: nothing to show
     private var hoverSuppressed = false  // closed by click/hotkey with the pointer on it: no reopen until it leaves
     private var previewing = false
     private var hotkeyOpened = false
@@ -129,6 +130,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         panel.onSwipe = { [weak self] in self?.swipe($0) }
         HotKey.set(enabled: UserDefaults.standard.bool(forKey: Pref.hotkey)) { [weak self] in self?.toggleFromHotkey() }
 
+        observeEnvironment()
         tracker = ScreenTracker(followMouse: UserDefaults.standard.bool(forKey: Pref.allDisplays)) { [weak self] in self?.move(to: $0) }
         NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
@@ -232,13 +234,52 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         hoverTask = Task {
             try? await Task.sleep(for: .seconds(delay))
             guard !Task.isCancelled, hoverRect.contains(NSEvent.mouseLocation) == inside else { return }
+            if inside, UserDefaults.standard.bool(forKey: Pref.haptics) {
+                NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
+            }
             setExpanded(inside)
         }
     }
 
     private func updateVisibility(screen: NSScreen?) {
+        let defaults = UserDefaults.standard
         let empty = store.primary == nil && state.approval == nil
-        if empty || screen == nil || UserDefaults.standard.bool(forKey: Pref.hideBadge) { panel.orderOut(nil) } else { panel.orderFrontRegardless() }
+        let fullscreen = defaults.bool(forKey: Pref.hideFullscreen) && screen.map(NotchGeometry.hasFullscreenWindow) == true
+        if empty || screen == nil || locked || fullscreen || defaults.bool(forKey: Pref.hideBadge) {
+            if state.expanded && !previewing { state.pinned = false; setExpanded(false) }
+            panel.orderOut(nil)
+        } else {
+            panel.orderFrontRegardless()
+        }
+    }
+
+    /// Full screen, lock, display sleep and our own menu all change what the island may do.
+    private func observeEnvironment() {
+        let ws = NSWorkspace.shared.notificationCenter, dist = DistributedNotificationCenter.default()
+        let refresh: @Sendable (Notification) -> Void = { [weak self] _ in
+            Task { @MainActor in self?.updateVisibility(screen: self?.tracker.current) }
+        }
+        for name in [NSWorkspace.activeSpaceDidChangeNotification, NSWorkspace.didActivateApplicationNotification] {
+            ws.addObserver(forName: name, object: nil, queue: .main, using: refresh)
+        }
+        for (center, name, on) in [(ws, NSWorkspace.screensDidSleepNotification, true), (ws, NSWorkspace.screensDidWakeNotification, false),
+                                   (dist, Notification.Name("com.apple.screenIsLocked"), true),
+                                   (dist, Notification.Name("com.apple.screenIsUnlocked"), false)] {
+            center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+                Task { @MainActor in
+                    self?.locked = on
+                    self?.updateVisibility(screen: self?.tracker.current)
+                }
+            }
+        }
+        // Our menu bar menu opening over an open card: close it, and hold hover until the menu is gone.
+        NotificationCenter.default.addObserver(forName: NSMenu.didBeginTrackingNotification, object: nil, queue: .main) { [weak self] _ in
+            Task { @MainActor in
+                guard let self else { return }
+                self.hoverTask?.cancel()
+                if !self.state.pinned { self.setExpanded(false) }
+            }
+        }
     }
 
     /// Pending permission request → side blob (collapsed) or page (expanded); notify once per new request.
@@ -246,7 +287,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func approvalsChanged() {
         let defaults = UserDefaults.standard
         let new = approvals.current.flatMap { defaults.bool(forKey: $0.isPlan ? Pref.planNotify : Pref.approvals) ? $0 : nil }
+        state.busySince = approvals.busySince ?? state.busySince  // keep the start until the finish is handled
         if approvals.busy != state.busy || approvals.done != state.done {
+            if state.busy, !approvals.busy, approvals.done, let since = state.busySince { finished(after: Date.now.timeIntervalSince(since)) }
+            if !approvals.busy { state.busySince = approvals.busySince }
             state.busy = approvals.busy
             state.done = approvals.done
             syncBlobs()
@@ -259,6 +303,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         syncBlobs()
         updateVisibility(screen: tracker.current)
+    }
+
+    /// A Claude turn ended. Notify when it ran at least the chosen time and no terminal is in front.
+    private func finished(after secs: TimeInterval) {
+        let min = UserDefaults.standard.double(forKey: Pref.finishNotify)
+        let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
+        guard Self.finishNotice(secs: secs, minimum: min, terminalInFront: front.map(Self.terminals.contains) ?? false) else { return }
+        let m = Int(secs) / 60, s = Int(secs) % 60
+        Notifier.post(title: "Claude finished", body: m > 0 ? "Took \(m)m \(s)s" : "Took \(s)s")
+    }
+
+    nonisolated static func finishNotice(secs: TimeInterval, minimum: Double, terminalInFront: Bool) -> Bool {
+        minimum >= 0 && secs >= minimum && !terminalInFront
     }
 
     private func swipe(_ dir: Int) {

@@ -23,6 +23,7 @@ final class Approvals {
     private(set) var pending: [Request] = []
     private(set) var busy = false  // any session between UserPromptSubmit and Stop (`busy-<id>` marker files)
     private(set) var done = false  // a session finished and nobody looked at the terminal yet (`done-<id>`)
+    private(set) var busySince: Date?  // oldest live busy marker's creation: the turn start (touches keep the birth time)
     var onPlanReady: (() -> Void)?
     var onChange: (() -> Void)?
 
@@ -65,10 +66,12 @@ final class Approvals {
     }
 
     private func reload() {
-        let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey])) ?? []
+        let files = (try? FileManager.default.contentsOfDirectory(at: directory, includingPropertiesForKeys: [.contentModificationDateKey, .creationDateKey])) ?? []
         let new = files.filter { $0.pathExtension == "raw" }.compactMap(Self.parse).sorted { $0.expires < $1.expires }
         // ponytail: Stop never fires on an interrupt, so a marker older than 30 min counts as stale.
-        let nowBusy = files.contains { $0.lastPathComponent.hasPrefix("busy-") && ((try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast) > .now - 1800 }
+        let live = files.filter { $0.lastPathComponent.hasPrefix("busy-") && ((try? $0.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast) > .now - 1800 }
+        let nowBusy = !live.isEmpty
+        busySince = live.compactMap { try? $0.resourceValues(forKeys: [.creationDateKey]).creationDate }.min()
         let nowDone = files.contains { $0.lastPathComponent.hasPrefix("done-") }
         if new.contains(where: \.isPlan) && !pending.contains(where: \.isPlan) { onPlanReady?() }
         guard new != pending || nowBusy != busy || nowDone != done else { return }

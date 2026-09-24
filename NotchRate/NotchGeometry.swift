@@ -56,6 +56,21 @@ struct NotchGeometry {
         NSRect(x: screen.frame.midX - size.width / 2, y: screen.frame.maxY - size.height, width: size.width, height: size.height)
     }
 
+    /// A normal-level window covering the whole display, menu bar included: an app in full screen there.
+    /// Window bounds need no Screen Recording permission (only titles do).
+    static func hasFullscreenWindow(on screen: NSScreen) -> Bool {
+        guard let primary = NSScreen.screens.first?.frame,
+              let windows = CGWindowListCopyWindowInfo([.optionOnScreenOnly, .excludeDesktopElements], kCGNullWindowID) as? [[String: Any]]
+        else { return false }
+        let f = screen.frame
+        let target = CGRect(x: f.minX, y: primary.maxY - f.maxY, width: f.width, height: f.height)  // Quartz: top-left origin
+        return windows.contains { w in
+            guard w[kCGWindowLayer as String] as? Int == 0, let b = w[kCGWindowBounds as String] as? NSDictionary,
+                  let r = CGRect(dictionaryRepresentation: b) else { return false }
+            return r.integral == target.integral
+        }
+    }
+
     static var notchScreen: NSScreen? { NSScreen.screens.first { $0.safeAreaInsets.top > 0 } }
 
     static func screen(under point: NSPoint) -> NSScreen? {

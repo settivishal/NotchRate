@@ -48,6 +48,7 @@ final class NotchState {
     var approval: Approvals.Request?  // side blob with a countdown ring while set; hover opens the Allow/Deny page
     var busy = false                  // Claude Code is working on a prompt: pulsing blob
     var done = false                  // it finished and the terminal has not been opened since: check blob
+    var busySince: Date?              // turn start, for the elapsed readout on the busy blob
     var limitHit = false              // a rate-limit bucket is at 100%: red blob counting down to the reset
     var timerActive: Bool { focusing || caffeinated }
     var claudeActive: Bool { approval != nil || limitHit || busy || done }
@@ -144,7 +145,7 @@ struct NotchView: View {
 
     /// 1 s ticks only while something counts down (approval expiry, caffeine ring/timer).
     private func ticking<V: View>(@ViewBuilder _ content: @escaping (Date) -> V) -> some View {
-        TimelineView(.periodic(from: .now, by: state.approval == nil && !state.caffeinated && !state.focusing ? 60 : 1)) { content($0.date) }
+        TimelineView(.periodic(from: .now, by: state.approval == nil && !state.caffeinated && !state.focusing && !state.busy ? 60 : 1)) { content($0.date) }
     }
 
     /// Collapsed notch body with the side blobs. Timer blob (focus, else caffeine) on one side (setting), Claude
@@ -168,7 +169,7 @@ struct NotchView: View {
                 sideBlob(leading: !blobLeft) {
                     if let r = state.approval { approvalBlob(r, now: now) }
                     else if state.limitHit, let snap = store.primary { limitBlob(snap, now: now) }
-                    else if state.busy { busyBlob }
+                    else if state.busy { busyBlob(now: now) }
                     else if state.done { doneBlob }
                 }
             }
@@ -255,10 +256,22 @@ struct NotchView: View {
             .onTapGesture { setPage(.overview); setExpanded(true) }
     }
 
-    private var busyBlob: some View {
-        Image(systemName: "sparkles").resizable().scaledToFit().frame(width: state.geometry.blobWidth * 0.28)
-            .foregroundStyle(.white).symbolEffect(.pulse)
-            .onTapGesture { setPage(.overview); setExpanded(true) }
+    /// Elapsed turn time once known ("42s", "3m", "1h"), else the pulsing sparkle.
+    private func busyBlob(now: Date) -> some View {
+        Group {
+            if let since = state.busySince {
+                let secs = max(0, Int(now.timeIntervalSince(since)))
+                Text(secs < 60 ? "\(secs)s" : secs < 3600 ? "\(secs / 60)m" : "\(secs / 3600)h")
+                    .font(.system(size: 10, weight: .bold, design: .rounded)).monospacedDigit()
+                    .lineLimit(1).minimumScaleFactor(0.6)
+                    .contentTransition(.numericText())
+            } else {
+                Image(systemName: "sparkles").resizable().scaledToFit().frame(width: state.geometry.blobWidth * 0.28)
+                    .symbolEffect(.pulse)
+            }
+        }
+        .foregroundStyle(.white)
+        .onTapGesture { setPage(.overview); setExpanded(true) }
     }
 
     /// Persists until a terminal app comes to the front (or a click).

@@ -23,12 +23,16 @@ enum Pref {
     static let planNotify = "planNotify"       // Bool, default true: notify when Claude Code presents a plan
     static let approvals = "approvals"         // Bool, default true: Allow/Deny island for permission prompts
     static let paceWarnedFor = "paceWarnedFor" // Double: session resets_at already warned about
+    static let hideFullscreen = "hideFullscreen" // Bool, default false: hide the badge while an app is full screen on its display
+    static let haptics = "haptics"             // Bool, default true: trackpad tap when hover opens the card
+    static let finishNotify = "finishNotify"   // Double seconds, default 60: notify when a Claude turn this long finishes; -1 off
 
     static func register() {
         UserDefaults.standard.register(defaults: [
             staleHours: 2.0, hoverDelay: 0.15, allDisplays: true, wingWidth: 44.0, showWeekly: false, hideBadge: false,
             ringGauges: true, pollSeconds: 60.0, cardRadius: 28.0, badgeCountdown: false, badgeRing: false, blobLeft: false,
             menuBarText: false, warnPct: 85.0, fullPct: 100.0, paceWarn: true, resetNotify: true, hotkey: true, planNotify: true, approvals: true,
+            hideFullscreen: false, haptics: true, finishNotify: 60.0,
         ])
     }
     static var staleAfter: TimeInterval { UserDefaults.standard.double(forKey: staleHours) * 3600 }
@@ -56,6 +60,9 @@ struct SettingsView: View {
     @AppStorage(Pref.hotkey) private var hotkey = true
     @AppStorage(Pref.planNotify) private var planNotify = true
     @AppStorage(Pref.approvals) private var approvals = true
+    @AppStorage(Pref.hideFullscreen) private var hideFullscreen = false
+    @AppStorage(Pref.haptics) private var haptics = true
+    @AppStorage(Pref.finishNotify) private var finishNotify = 60.0
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
 
     var body: some View {
@@ -75,6 +82,7 @@ struct SettingsView: View {
             }
             Section("Badge") {
                 Toggle("Hide badge (menu bar only)", isOn: $hideBadge)
+                Toggle("Hide while an app is full screen", isOn: $hideFullscreen)
                 Toggle("Show weekly (7d) in badge", isOn: $showWeekly)
                 Toggle("Time to reset instead of %", isOn: $badgeCountdown)
                 Toggle("Ring instead of dot", isOn: $badgeRing)
@@ -83,6 +91,7 @@ struct SettingsView: View {
                 Slider(value: $wingWidth, in: 30...120, step: 2) { Text("Badge width beside notch: \(Int(wingWidth))pt") }
             }
             Section("Card") {
+                Toggle("Haptic tap when the card opens", isOn: $haptics)
                 Picker("Gauges", selection: $ringGauges) {
                     Text("Rings").tag(true)
                     Text("Bars").tag(false)
@@ -105,9 +114,14 @@ struct SettingsView: View {
                 Toggle("Allow/Deny island for permission prompts", isOn: $approvals)
                 Text("Tool prompts wait \(Int(Approvals.wait))s on the notch, plans \(Int(Approvals.planWait))s; then the terminal prompt takes over.").font(.caption).foregroundStyle(.secondary)
                 Toggle("Plans: notify and approve from the notch", isOn: $planNotify)
+                Picker("Notify when a task finishes", selection: $finishNotify) {
+                    Text("Off").tag(-1.0)
+                    Text("Always").tag(0.0)
+                    ForEach([30.0, 60, 120, 300], id: \.self) { Text("After \(Int($0) < 60 ? "\(Int($0))s" : "\(Int($0) / 60)m")+").tag($0) }
+                }
             }
         }
         .formStyle(.grouped)
-        .frame(width: 400, height: 740)
+        .frame(width: 400, height: 820)
     }
 }

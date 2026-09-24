@@ -21,3 +21,11 @@ import Testing
     #expect((d?["updatedInput"] as? [String: Any])?["plan"] as? String == "# Title\n- step")
     #expect(((d?["updatedPermissions"] as? [[String: Any]])?.first?["mode"] as? String) == "acceptEdits")
 }
+
+@Test func finishNoticeRespectsMinimumAndTerminal() {
+    #expect(AppDelegate.finishNotice(secs: 90, minimum: 60, terminalInFront: false))
+    #expect(!AppDelegate.finishNotice(secs: 30, minimum: 60, terminalInFront: false))
+    #expect(!AppDelegate.finishNotice(secs: 90, minimum: 60, terminalInFront: true))
+    #expect(!AppDelegate.finishNotice(secs: 900, minimum: -1, terminalInFront: false))  // off
+    #expect(AppDelegate.finishNotice(secs: 1, minimum: 0, terminalInFront: false))      // always
+}
