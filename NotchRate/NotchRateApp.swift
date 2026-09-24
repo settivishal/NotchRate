@@ -69,6 +69,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var blobChange = 0  // same, for blob pop-in completions
     private var hoverTask: Task<Void, Never>?
     private var pointerInside = false
+    private let logs = LogReader()
+    private var spendRead = Date.distantPast
     private var locked = false  // screen locked or displays asleep: nothing to show
     private var hoverSuppressed = false  // closed by click/hotkey with the pointer on it: no reopen until it leaves
     private var previewing = false
@@ -318,6 +320,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         minimum >= 0 && secs >= minimum && !terminalInFront
     }
 
+    /// Re-reads the transcripts' new bytes off the main thread, at most every 20 s.
+    private func refreshSpend() {
+        guard Date.now.timeIntervalSince(spendRead) > 20 else { return }
+        spendRead = .now
+        Task { state.spend = await logs.spend() }
+    }
+
     private func swipe(_ dir: Int) {
         let tabs = Tab.allCases
         guard state.expanded, let i = tabs.firstIndex(of: state.page.tab) else { return }
@@ -337,6 +346,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if state.approval != nil { state.page = .approval }  // pending request opens on its own page
             state.cardShown = true
             canvas.cardVisible = true
+            refreshSpend()
             withAnimation(Motion.goo()) { state.expanded = true }
             present(delay: state.timerBlob || state.claudeBlob ? 0.1 : 0, fade: .in)  // blobs land first, then the card grows
         } else {
@@ -374,6 +384,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func setPage(_ page: Page) {
         guard page != state.page else { return }
+        if page == .spend { refreshSpend() }
         state.page = page
         if state.expanded { present() }
     }

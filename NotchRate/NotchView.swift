@@ -22,13 +22,14 @@ enum Tab: CaseIterable {
 }
 
 enum Page: CaseIterable {
-    case overview, trends, week, caffeine, focus, approval
+    case overview, trends, week, spend, caffeine, focus, approval
     var tab: Tab { self == .caffeine ? .caffeine : self == .focus ? .focus : .claude }
     var title: String {
         switch self {
         case .overview: "Overview"
         case .trends: "Trends"
         case .week: "Week"
+        case .spend: "Spend"
         case .caffeine: "Caffeinate"
         case .focus: "Focus"
         case .approval: "Approval"
@@ -49,6 +50,7 @@ final class NotchState {
     var busy = false                  // Claude Code is working on a prompt: pulsing blob
     var done = false                  // it finished and the terminal has not been opened since: check blob
     var busySince: Date?              // turn start, for the elapsed readout on the busy blob
+    var spend: Spend?                 // API-value estimate from Claude Code's transcripts; nil until first read
     var limitHit = false              // a rate-limit bucket is at 100%: red blob counting down to the reset
     var timerActive: Bool { focusing || caffeinated }
     var claudeActive: Bool { approval != nil || limitHit || busy || done }
@@ -195,6 +197,7 @@ struct NotchView: View {
             case .overview where snap != nil: expanded(snap!, level: snap!.level(now: now, staleAfter: staleHours * 3600), now: now)
             case .trends where snap != nil: trends(snap!, now: now)
             case .week where snap != nil: week(snap!, now: now)
+            case .spend: spendPage(now: now)
             case .overview, .trends, .week:
                 Text("No usage data yet").font(.caption).foregroundStyle(.secondary).frame(maxHeight: .infinity)
             case .caffeine: caffeinePage(now: now)
@@ -642,6 +645,86 @@ struct NotchView: View {
         .padding(.bottom, 12)
         .foregroundStyle(.white)
         .transition(.opacity)
+    }
+
+    // MARK: spend
+
+    /// What the logged tokens would cost at API list prices, with where it went and a 13-week activity map.
+    private func spendPage(now: Date) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            header { Text("API value · est.") }
+            if let s = state.spend {
+                HStack {
+                    stat("Today", s.today)
+                    stat("7 days", s.week)
+                    stat("30 days", s.month)
+                }
+                HStack(alignment: .top, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        breakdown(s.byModel.prefix(3), total: s.month)
+                        breakdown(s.byProject.prefix(3), total: s.month)
+                    }
+                    heatmap(s.daily, now: now)
+                }
+                Text([s.cacheHit.map { "\(Int(($0 * 100).rounded()))% of prompt tokens from cache" },
+                      s.unpriced > 0 ? "\(s.unpriced) unpriced" : nil].compactMap(\.self).joined(separator: " · "))
+                    .font(.caption2).foregroundStyle(.gray)
+            } else {
+                Text("Reading Claude Code logs…").font(.caption).foregroundStyle(.secondary).frame(maxHeight: .infinity)
+            }
+        }
+        .padding(.horizontal, 22)
+        .padding(.bottom, 12)
+        .foregroundStyle(.white)
+        .transition(.opacity)
+    }
+
+    private func stat(_ title: String, _ dollars: Double) -> some View {
+        VStack(alignment: .leading, spacing: 1) {
+            Text(dollars.formatted(.currency(code: "USD").precision(.fractionLength(dollars < 100 ? 2 : 0))))
+                .font(.system(size: 17, weight: .bold, design: .rounded)).monospacedDigit()
+            Text(title).font(.caption2).foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Name, share bar and cost; shares are of the 30-day total.
+    private func breakdown(_ rows: ArraySlice<Spend.Row>, total: Double) -> some View {
+        VStack(alignment: .leading, spacing: 3) {
+            ForEach(rows, id: \.name) { r in
+                HStack(spacing: 6) {
+                    Text(r.name).font(.caption2).lineLimit(1).truncationMode(.middle).frame(width: 64, alignment: .leading)
+                    Capsule().fill(.white.opacity(0.15)).frame(height: 4)
+                        .overlay(alignment: .leading) {
+                            GeometryReader { g in Capsule().fill(Color.accentColor).frame(width: g.size.width * (total > 0 ? r.cost / total : 0)) }
+                        }
+                    Text(r.cost.formatted(.currency(code: "USD").precision(.fractionLength(0)))).font(.caption2).monospacedDigit()
+                        .foregroundStyle(.secondary).frame(width: 38, alignment: .trailing)
+                }
+            }
+        }
+    }
+
+    /// 13 weeks × 7 days, oldest top-left, today bottom-right; brightness scales with the day's cost.
+    private func heatmap(_ daily: [Date: Double], now: Date) -> some View {
+        let cal = Calendar.current, today = cal.startOfDay(for: now)
+        let weekday = (cal.component(.weekday, from: today) - cal.firstWeekday + 7) % 7  // today's row
+        let peak = max(daily.values.max() ?? 0, 0.01)
+        return HStack(spacing: 2) {
+            ForEach(0..<13, id: \.self) { col in
+                VStack(spacing: 2) {
+                    ForEach(0..<7, id: \.self) { row in
+                        let back = (12 - col) * 7 + (weekday - row)
+                        let day = cal.date(byAdding: .day, value: -back, to: today)!
+                        let cost = daily[day] ?? 0
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(back < 0 ? .clear : cost > 0 ? Color.accentColor.opacity(0.25 + 0.75 * cost / peak) : .white.opacity(0.08))
+                            .frame(width: 8, height: 8)
+                            .help(back < 0 ? "" : "\(day.formatted(.dateTime.month(.abbreviated).day())): \(cost.formatted(.currency(code: "USD")))")
+                    }
+                }
+            }
+        }
     }
 
     private func ring(_ title: String, _ pct: Double?, resets: Double?, now: Date, stale: Bool) -> some View {
