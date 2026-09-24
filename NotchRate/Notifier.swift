@@ -1,8 +1,40 @@
+import SwiftUI
 import UserNotifications
+
+/// A short alert. Shown as a banner growing out of the closed island when it can be, else as a system notification.
+struct Notice: Equatable {
+    var title: String
+    var body: String
+    var icon: String
+    var tint: Color
+    var page: Page? = nil  // opened by a click on the banner
+}
 
 /// Fires once per upward crossing of the configured thresholds on either rate-limit bucket,
 /// plus one pace warning per session window.
 enum Notifier {
+    /// Set by the app: shows a notice in the island, false when it cannot (card open, badge hidden, setting off).
+    @MainActor static var island: ((Notice) -> Bool)?
+
+    @MainActor static func post(_ n: Notice) {
+        if island?(n) == true { return }
+        post(title: n.title, body: n.body)
+    }
+
+    /// Icon and color for a threshold/reset/pace message.
+    static func notice(title: String, message msg: String) -> Notice {
+        if msg.hasSuffix("limit reset") { return Notice(title: title, body: msg, icon: "arrow.counterclockwise.circle.fill", tint: .green, page: .overview) }
+        if msg.hasPrefix("At this pace") { return Notice(title: title, body: msg, icon: "speedometer", tint: .yellow, page: .trends) }
+        let full = msg.hasSuffix("100%")
+        return Notice(title: title, body: msg, icon: full ? "exclamationmark.octagon.fill" : "gauge.with.dots.needle.67percent",
+                      tint: full ? .red : .orange, page: .overview)
+    }
+
+    /// Pure: warn once per day when today's API-value spend reaches the budget. `primed` is false for the
+    /// first reading after launch, so a budget passed earlier today is history rather than news.
+    static func budgetCrossed(today: Double, budget: Double, day: Double, warnedDay: Double, primed: Bool) -> Bool {
+        budget > 0 && today >= budget && warnedDay != day && primed
+    }
     static func requestAuthorization() {
         guard Bundle.main.bundleIdentifier != nil else { return }  // unbundled `swift run` would crash
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
@@ -55,7 +87,7 @@ enum Notifier {
                 msgs.append(m)
                 defaults.set(resets, forKey: Pref.paceWarnedFor)
             }
-            for msg in msgs { post(title: snap.tool == "claude-code" ? "Claude" : snap.tool, body: msg) }
+            for msg in msgs { post(notice(title: snap.tool == "claude-code" ? "Claude" : snap.tool, message: msg)) }
         }
     }
 

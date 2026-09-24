@@ -51,6 +51,8 @@ final class NotchState {
     var done = false                  // it finished and the terminal has not been opened since: check blob
     var busySince: Date?              // turn start, for the elapsed readout on the busy blob
     var spend: Spend?                 // API-value estimate from Claude Code's transcripts; nil until first read
+    var notice: Notice?               // banner out of the closed island; drives its size and merges the blobs
+    var noticeShown: Notice?          // what the banner draws: kept through the closing fade after `notice` clears
     var limitHit = false              // a rate-limit bucket is at 100%: red blob counting down to the reset
     var timerActive: Bool { focusing || caffeinated }
     var claudeActive: Bool { approval != nil || limitHit || busy || done }
@@ -77,7 +79,8 @@ final class NotchState {
             onBlobChange?()
             schedule(&focusTimer, until: focusUntil) { s in
                 s.focusUntil = nil
-                Notifier.post(title: "Focus", body: "\(Int(s.focusStarted.distance(to: .now) / 60)) min done — take a break")
+                Notifier.post(Notice(title: "Focus done", body: "\(Int(s.focusStarted.distance(to: .now) / 60)) min — take a break",
+                                     icon: "timer", tint: .indigo, page: .focus))
             }
         }
     }
@@ -140,7 +143,10 @@ struct NotchView: View {
         Group {
             switch part {
             case .badge: ticking { badge(now: $0) }
-            case .card: if state.cardShown { ticking { card(now: $0) } }
+            case .card:
+                if state.cardShown {
+                    if !state.expanded, let n = state.noticeShown { noticeBanner(n) } else { ticking { card(now: $0) } }
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -158,8 +164,9 @@ struct NotchView: View {
     private func badge(now: Date) -> some View {
         let geo = state.geometry
         let size = geo.collapsedSize(blob: state.slack)
-        let claudeMerge: CGFloat = state.expanded || !state.claudeBlob ? 1 : 0
-        let timerMerge: CGFloat = state.expanded || !state.timerBlob ? 1 : 0
+        let open = state.expanded || state.notice != nil
+        let claudeMerge: CGFloat = open || !state.claudeBlob ? 1 : 0
+        let timerMerge: CGFloat = open || !state.timerBlob ? 1 : 0
         return ZStack(alignment: .top) {
             GooBody(shape: .forHeight(geo.topHeight, notch: geo.hasNotch, cardRadius: cardRadius),
                     blob: geo.blobWidth, gap: NotchGeometry.blobGap, slack: state.slack,
@@ -215,6 +222,32 @@ struct NotchView: View {
         }
         .frame(width: size.width, height: size.height, alignment: .top)
         .animation(Motion.card, value: state.page)
+    }
+
+    /// One row under the notch: icon, title and detail. A click opens the card on the notice's page.
+    private func noticeBanner(_ n: Notice) -> some View {
+        let geo = state.geometry, size = geo.noticeSize
+        let side = NotchShape.forHeight(size.height, notch: geo.hasNotch, cardRadius: cardRadius).topRadius + NotchGeometry.cardMargin
+        return VStack(spacing: 0) {
+            Color.clear.frame(height: geo.topHeight)
+            HStack(spacing: 10) {
+                Image(systemName: n.icon).font(.system(size: 18, weight: .semibold)).foregroundStyle(n.tint).frame(width: 24)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(n.title).font(.callout.weight(.semibold)).lineLimit(1)
+                    Text(n.body).font(.caption).foregroundStyle(.secondary).lineLimit(1).truncationMode(.middle)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, side)
+            .frame(maxHeight: .infinity)
+        }
+        .foregroundStyle(.white)
+        .frame(width: size.width, height: size.height)
+        .contentShape(Rectangle())
+        .onTapGesture {
+            if let p = n.page { setPage(p) }
+            setExpanded(true)
+        }
     }
 
     // MARK: side blobs

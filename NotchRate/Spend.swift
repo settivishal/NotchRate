@@ -127,7 +127,19 @@ actor LogReader {
 
     init(root: URL = FileManager.default.homeDirectoryForCurrentUser.appending(path: ".claude/projects")) { self.root = root }
 
-    func spend(now: Date = .now) -> Spend {
+    func spend(now: Date = .now) -> Spend { Spend(records(now: now), now: now) }
+
+    /// The turn that just ended: replies since `since` in the project of the latest one.
+    func turn(since: Date, now: Date = .now) -> Turn? {
+        let recent = records(now: now).filter { $0.ts >= since.timeIntervalSince1970 }
+        guard let last = recent.max(by: { $0.ts < $1.ts }) else { return nil }
+        let mine = recent.filter { $0.project == last.project }
+        return Turn(project: last.project, cost: mine.reduce(0) { $0 + (Pricing.cost($1) ?? 0) }, output: mine.reduce(0) { $0 + $1.output })
+    }
+
+    struct Turn: Sendable, Equatable { let project: String; let cost: Double; let output: Int }
+
+    private func records(now: Date) -> [LogRecord] {
         let cutoff = now.addingTimeInterval(-Self.window)
         let keys: Set<URLResourceKey> = [.contentModificationDateKey, .fileSizeKey]
         var seen = Set<String>()
@@ -142,7 +154,7 @@ actor LogReader {
         // Resumed sessions copy earlier replies into a new file: dedupe across files too.
         var all: [String: LogRecord] = [:]
         for (_, f) in files { for (k, r) in f.records where r.ts >= cutoff.timeIntervalSince1970 { all[k] = all[k].map { $0.merged(r) } ?? r } }
-        return Spend(Array(all.values), now: now)
+        return Array(all.values)
     }
 
     private func read(_ url: URL, size: UInt64) {

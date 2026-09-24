@@ -65,6 +65,9 @@ struct NotchGeometry {
         return CGSize(width: max(card.width, collapsedSize(blob: true).width), height: topHeight + card.height + Self.tabBar + 4)  // +4: 16pt bottom margin (was 12)
     }
 
+    /// Banner that grows out of the closed island for a notice: one row under the notch.
+    var noticeSize: CGSize { CGSize(width: max(collapsedSize(blob: true).width, 320), height: topHeight + 50) }
+
     /// Top-center frame for a window of `size` on this screen.
     func frame(for size: CGSize) -> NSRect {
         NSRect(x: screen.frame.midX - size.width / 2, y: screen.frame.maxY - size.height, width: size.width, height: size.height)

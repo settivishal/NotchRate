@@ -72,6 +72,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let logs = LogReader()
     private var spendRead = Date.distantPast
     private var flashTask: Task<Void, Never>?
+    private var noticeTask: Task<Void, Never>?
+    private var budgetPrimed = false  // first spend reading after launch only records the day
     private var locked = false  // screen locked or displays asleep: nothing to show
     private var hoverSuppressed = false  // closed by click/hotkey with the pointer on it: no reopen until it leaves
     private var previewing = false
@@ -91,6 +93,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         Pref.register()
         NSApp.setActivationPolicy(.accessory)
         Notifier.requestAuthorization()
+        Notifier.island = { [weak self] in self?.showNotice($0) ?? false }
         Statusline.refreshIfInstalled()
 
         store = UsageStore()
@@ -134,6 +137,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         HotKey.set(enabled: UserDefaults.standard.bool(forKey: Pref.hotkey)) { [weak self] in self?.toggleFromHotkey() }
 
         observeEnvironment()
+        refreshSpend()  // primes the budget: a budget passed before launch is not news
         tracker = ScreenTracker(followMouse: UserDefaults.standard.bool(forKey: Pref.allDisplays)) { [weak self] in self?.move(to: $0) }
         NotificationCenter.default.addObserver(forName: UserDefaults.didChangeNotification, object: nil, queue: .main) { [weak self] _ in
             Task { @MainActor in
@@ -159,8 +163,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         updateVisibility(screen: screen)
     }
 
-    private var silhouetteSize: CGSize { state.expanded ? expandedSize(for: state.page) : state.geometry.collapsedSize }
-    private var windowSize: CGSize { state.expanded ? expandedSize(for: state.page) : state.geometry.collapsedSize(blob: state.slack) }
+    private var silhouetteSize: CGSize {
+        state.expanded ? expandedSize(for: state.page) : state.notice != nil ? state.geometry.noticeSize : state.geometry.collapsedSize
+    }
+    private var windowSize: CGSize {
+        state.expanded ? expandedSize(for: state.page) : state.notice != nil ? state.geometry.noticeSize : state.geometry.collapsedSize(blob: state.slack)
+    }
+
+    /// Grows a banner out of the closed island for a few seconds. False when it cannot show (setting off, card
+    /// open, badge hidden): the caller posts a system notification instead.
+    private func showNotice(_ n: Notice) -> Bool {
+        guard UserDefaults.standard.bool(forKey: Pref.islandNotices), panel.isVisible, !state.expanded else { return false }
+        noticeTask?.cancel()
+        state.noticeShown = n
+        state.cardShown = true
+        canvas.cardVisible = true
+        withAnimation(Motion.goo()) { state.notice = n }
+        present(fade: .in)
+        noticeTask = Task {
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled, state.notice != nil, !state.expanded else { return }
+            withAnimation(Motion.goo(expanding: false)) { state.notice = nil }
+            present(fade: .out)
+        }
+        return true
+    }
 
     /// Springs the silhouette to the current state. The window takes the union of old and new sizes first and
     /// settles to the new one when the spring ends, so neither end is clipped and nothing waits on a guessed delay.
@@ -179,9 +206,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func settle() {
         animating = false
-        if !state.expanded {
+        if !state.expanded && state.notice == nil {
             state.cardShown = false
             canvas.cardVisible = false
+            state.noticeShown = nil
             state.page = .overview
         }
         canvas.badgeSize = state.geometry.collapsedSize(blob: state.slack)
@@ -312,9 +340,34 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func finished(after secs: TimeInterval) {
         let min = UserDefaults.standard.double(forKey: Pref.finishNotify)
         let front = NSWorkspace.shared.frontmostApplication?.bundleIdentifier
-        guard Self.finishNotice(secs: secs, minimum: min, terminalInFront: front.map(Self.terminals.contains) ?? false) else { return }
-        let m = Int(secs) / 60, s = Int(secs) % 60
-        Notifier.post(title: "Claude finished", body: m > 0 ? "Took \(m)m \(s)s" : "Took \(s)s")
+        let notify = Self.finishNotice(secs: secs, minimum: min, terminalInFront: front.map(Self.terminals.contains) ?? false)
+        let since = Date.now.addingTimeInterval(-secs)
+        Task {
+            try? await Task.sleep(for: .seconds(1))  // let the last reply land in the transcript
+            let turn = await logs.turn(since: since)
+            updateSpend(await logs.spend())  // the turn's cost counts toward the budget now, not on next open
+            guard notify else { return }
+            let m = Int(secs) / 60, s = Int(secs) % 60
+            let parts = [turn?.project, m > 0 ? "\(m)m \(s)s" : "\(s)s",
+                         turn.map { $0.cost.formatted(.currency(code: "USD")) },
+                         turn.flatMap { $0.output > 0 ? "\($0.output.formatted(.number.notation(.compactName))) out" : nil }]
+            Notifier.post(Notice(title: "Claude finished", body: parts.compactMap(\.self).joined(separator: " · "),
+                                 icon: "checkmark.circle.fill", tint: .green, page: .spend))
+        }
+    }
+
+    /// New spend reading: publish it and warn once a day when it passes the budget.
+    private func updateSpend(_ spend: Spend) {
+        state.spend = spend
+        let d = UserDefaults.standard, day = Calendar.current.startOfDay(for: .now).timeIntervalSince1970
+        let budget = d.double(forKey: Pref.dailyBudget)
+        let crossed = Notifier.budgetCrossed(today: spend.today, budget: budget, day: day,
+                                             warnedDay: d.double(forKey: Pref.budgetWarnedDay), primed: budgetPrimed)
+        if budget > 0, spend.today >= budget { d.set(day, forKey: Pref.budgetWarnedDay) }  // also when unprimed: once a day
+        budgetPrimed = true
+        guard crossed else { return }
+        Notifier.post(Notice(title: "Daily budget reached", body: "\(spend.today.formatted(.currency(code: "USD"))) of API value today (budget $\(Int(budget)))",
+                             icon: "dollarsign.circle.fill", tint: .red, page: .spend))
     }
 
     nonisolated static func finishNotice(secs: TimeInterval, minimum: Double, terminalInFront: Bool) -> Bool {
@@ -325,7 +378,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func refreshSpend() {
         guard Date.now.timeIntervalSince(spendRead) > 20 else { return }
         spendRead = .now
-        Task { state.spend = await logs.spend() }
+        Task { updateSpend(await logs.spend()) }
     }
 
     private func swipe(_ dir: Int) {
@@ -348,7 +401,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             state.cardShown = true
             canvas.cardVisible = true
             refreshSpend()
-            withAnimation(Motion.goo()) { state.expanded = true }
+            noticeTask?.cancel()
+            withAnimation(Motion.goo()) { state.expanded = true; state.notice = nil }
             present(delay: state.timerBlob || state.claudeBlob ? 0.1 : 0, fade: .in)  // blobs land first, then the card grows
         } else {
             withAnimation(Motion.goo(expanding: false)) { state.expanded = false }

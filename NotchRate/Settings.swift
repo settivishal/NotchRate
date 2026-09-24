@@ -27,6 +27,9 @@ enum Pref {
     static let haptics = "haptics"             // Bool, default true: trackpad tap when hover opens the card
     static let cardSize = "cardSize"           // String, default "compact": compact / spacious / custom card preset
     static let cardScale = "cardScale"         // Double, default 1.25: custom preset scale, 1–1.6
+    static let islandNotices = "islandNotices" // Bool, default true: alerts appear as a banner from the notch
+    static let dailyBudget = "dailyBudget"     // Double dollars, default 0 (off): warn when today's API value passes it
+    static let budgetWarnedDay = "budgetWarnedDay" // Double: start of the day already warned about
     static let finishNotify = "finishNotify"   // Double seconds, default 60: notify when a Claude turn this long finishes; -1 off
 
     static func register() {
@@ -34,7 +37,7 @@ enum Pref {
             staleHours: 2.0, hoverDelay: 0.15, allDisplays: true, wingWidth: 44.0, showWeekly: false, hideBadge: false,
             ringGauges: true, pollSeconds: 60.0, cardRadius: 28.0, badgeCountdown: false, badgeRing: false, blobLeft: false,
             menuBarText: false, warnPct: 85.0, fullPct: 100.0, paceWarn: true, resetNotify: true, hotkey: true, planNotify: true, approvals: true,
-            hideFullscreen: false, cardSize: "compact", cardScale: 1.25, haptics: true, finishNotify: 60.0,
+            hideFullscreen: false, cardSize: "compact", cardScale: 1.25, islandNotices: true, dailyBudget: 0.0, haptics: true, finishNotify: 60.0,
         ])
     }
     static var staleAfter: TimeInterval { UserDefaults.standard.double(forKey: staleHours) * 3600 }
@@ -65,6 +68,8 @@ struct SettingsView: View {
     @AppStorage(Pref.hideFullscreen) private var hideFullscreen = false
     @AppStorage(Pref.haptics) private var haptics = true
     @AppStorage(Pref.finishNotify) private var finishNotify = 60.0
+    @AppStorage(Pref.islandNotices) private var islandNotices = true
+    @AppStorage(Pref.dailyBudget) private var dailyBudget = 0.0
     @AppStorage(Pref.cardSize) private var cardSize = "compact"
     @AppStorage(Pref.cardScale) private var cardScale = 1.25
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
@@ -121,6 +126,13 @@ struct SettingsView: View {
                 } onEditingChanged: { AppDelegate.shared?.preview($0) }
             }
             Section("Alerts") {
+                Toggle("Show alerts on the notch", isOn: $islandNotices)
+                Text("A banner grows out of the notch for a few seconds; macOS notifications take over while the card is open or the badge is hidden.")
+                    .font(.caption).foregroundStyle(.secondary)
+                Picker("Daily budget (API value)", selection: $dailyBudget) {
+                    Text("Off").tag(0.0)
+                    ForEach([5.0, 10, 25, 50, 100, 250], id: \.self) { Text("$\(Int($0))").tag($0) }
+                }
                 Slider(value: $warnPct, in: 50...99, step: 1) { Text("Warn at \(Int(warnPct))%") }
                 Slider(value: $fullPct, in: 60...100, step: 1) { Text("Alert at \(Int(fullPct))%") }
                 Toggle("Warn when pace hits 100% before reset", isOn: $paceWarn)
@@ -138,6 +150,6 @@ struct SettingsView: View {
             }
         }
         .formStyle(.grouped)
-        .frame(width: 400, height: 880)
+        .frame(width: 400, height: 960)
     }
 }

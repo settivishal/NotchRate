@@ -44,3 +44,26 @@ import Testing
         #expect(abs(await reader.spend(now: now).today - (0.0425 + 0.03 * 2)) < 1e-9)
     }
 }
+
+extension SpendTests {
+    @Test func turnSumsLatestProjectSinceStart() async throws {
+        let dir = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString)
+        try FileManager.default.createDirectory(at: dir.appending(path: "p"), withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let now = Date.now, fmt = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+        let old = Self.line(id: "m0", ts: fmt.format(now.addingTimeInterval(-600)), output: 999)  // before the turn
+        let a = Self.line(id: "m1", ts: fmt.format(now.addingTimeInterval(-30)), output: 500)
+        let b = Self.line(id: "m2", ts: fmt.format(now.addingTimeInterval(-10)), output: 0)
+        try ([old, a, b].map { $0 + Data("\n".utf8) }.reduce(Data(), +)).write(to: dir.appending(path: "p/a.jsonl"))
+        let t = try #require(await LogReader(root: dir).turn(since: now.addingTimeInterval(-60), now: now))
+        #expect(t.project == "App" && t.output == 500 && abs(t.cost - (0.0425 + 0.03)) < 1e-9)
+    }
+
+    @Test func budgetWarnsOncePerDayAfterPriming() {
+        #expect(Notifier.budgetCrossed(today: 26, budget: 25, day: 100, warnedDay: 0, primed: true))
+        #expect(!Notifier.budgetCrossed(today: 26, budget: 25, day: 100, warnedDay: 100, primed: true))  // already today
+        #expect(!Notifier.budgetCrossed(today: 26, budget: 25, day: 100, warnedDay: 0, primed: false))   // passed before launch
+        #expect(!Notifier.budgetCrossed(today: 24, budget: 25, day: 100, warnedDay: 0, primed: true))
+        #expect(!Notifier.budgetCrossed(today: 99, budget: 0, day: 100, warnedDay: 0, primed: true))     // off
+    }
+}
