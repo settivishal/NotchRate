@@ -75,7 +75,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var hoverSuppressed = false  // closed by click/hotkey with the pointer on it: no reopen until it leaves
     private var previewing = false
     private var hotkeyOpened = false
-    static let terminals: Set<String> = [
+    nonisolated static let terminals: Set<String> = [
         "com.googlecode.iterm2", "com.apple.Terminal", "com.mitchellh.ghostty", "dev.warp.Warp-Stable", "net.kovidgoyal.kitty",
         "org.alacritty", "com.github.wez.wezterm", "com.microsoft.VSCode", "com.todesktop.230313mzl4w4u92",  // last one is Cursor
     ]
