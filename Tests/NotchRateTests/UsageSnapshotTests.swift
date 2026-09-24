@@ -140,3 +140,19 @@ extension PollerTests {
         #expect(snap.models?["opus"]?.pct == 40)
     }
 }
+
+extension HistoryTests {
+    /// load() caches by modification date; a new row must still show up.
+    @Test func loadSeesAppendsThroughCache() throws {
+        let saved = History.file
+        defer { History.file = saved }
+        History.file = FileManager.default.temporaryDirectory.appending(path: UUID().uuidString + ".jsonl")
+        defer { try? FileManager.default.removeItem(at: History.file) }
+        let now = Date.now
+        History.append(UsageSnapshot(tool: "t", sessionUsedPct: 10, lastUpdated: now.timeIntervalSince1970 - 60))
+        #expect(History.load(now: now).count == 1)
+        #expect(History.load(now: now).count == 1)  // served from cache
+        History.append(UsageSnapshot(tool: "t", sessionUsedPct: 20, lastUpdated: now.timeIntervalSince1970))
+        #expect(History.load(now: now).map(\.s) == [10, 20])
+    }
+}

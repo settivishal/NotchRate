@@ -1,4 +1,5 @@
 import AppKit
+import SwiftUI
 
 /// Transparent, click-through-free panel floating above the menu bar on every Space.
 final class NotchPanel: NSPanel {
@@ -13,6 +14,8 @@ final class NotchPanel: NSPanel {
         level = NSWindow.Level(rawValue: Int(CGWindowLevelForKey(.mainMenuWindow)) + 3)
         collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
         acceptsMouseMovedEvents = true
+        animationBehavior = .none  // the canvas animates; no AppKit window fade on top
+        hidesOnDeactivate = false
     }
 
     /// Two-finger horizontal swipe over the panel; +1 = next tab, -1 = previous. One call per gesture.
@@ -62,6 +65,7 @@ final class NotchCanvas: NSView, CAAnimationDelegate {
     private let card: NSView
     private let backdrop = CAShapeLayer()
     private let cardMask = CAShapeLayer()
+    private let edge = CAShapeLayer()  // hairline outline for Increase Contrast
     private var silhouette = CGSize.zero
     private var seq = 0  // only the latest spring may report completion
     private var done: (() -> Void)?
@@ -82,6 +86,14 @@ final class NotchCanvas: NSView, CAAnimationDelegate {
         backdrop.zPosition = -1  // under both hosting views
         layer?.addSublayer(backdrop)
         cardMask.fillColor = NSColor.black.cgColor
+        edge.fillColor = nil
+        edge.lineWidth = 1
+        edge.zPosition = 1  // over the card content
+        layer?.addSublayer(edge)
+        NSWorkspace.shared.notificationCenter.addObserver(forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+                                                          object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.applyPaths() }
+        }
         cardMask.opacity = 0
         addSubview(badge)
         addSubview(card)
@@ -110,6 +122,11 @@ final class NotchCanvas: NSView, CAAnimationDelegate {
         backdrop.path = NotchShape.forHeight(silhouette.height, notch: notch, cardRadius: r)
             .path(in: CGRect(x: (bounds.width - silhouette.width) / 2, y: 0, width: silhouette.width, height: silhouette.height)).cgPath
         cardMask.path = backdrop.path
+        edge.frame = bounds
+        edge.path = backdrop.path
+        // Open card only: the closed badge merges with the physical notch and must stay borderless.
+        let contrast = NSWorkspace.shared.accessibilityDisplayShouldIncreaseContrast && silhouette.height > 64
+        edge.strokeColor = NSColor.white.withAlphaComponent(contrast ? 0.45 : 0).cgColor
         CATransaction.commit()
     }
 
@@ -128,6 +145,7 @@ final class NotchCanvas: NSView, CAAnimationDelegate {
         layoutSubtreeIfNeeded()
         applyPaths()  // bounds may not have changed, so layout() may not have run
         backdrop.removeAnimation(forKey: "path")
+        edge.removeAnimation(forKey: "path")
         cardMask.removeAllAnimations()
         if fade != .none { cardMask.opacity = fade == .out ? 0 : 1 }
         guard animated, let from, let to = backdrop.path else {
@@ -148,6 +166,7 @@ final class NotchCanvas: NSView, CAAnimationDelegate {
             spring.fillMode = .backwards
         }
         cardMask.add(spring.copy() as! CAAnimation, forKey: "path")
+        edge.add(spring.copy() as! CAAnimation, forKey: "path")
         spring.delegate = self
         spring.setValue(seq, forKey: "seq")
         backdrop.add(spring, forKey: "path")
@@ -204,4 +223,9 @@ final class NotchCanvas: NSView, CAAnimationDelegate {
     override func mouseEntered(with event: NSEvent) { onPointer?() }
     override func mouseExited(with event: NSEvent) { onPointer?() }
     override func mouseMoved(with event: NSEvent) { onPointer?() }
+}
+
+/// Non-activating panel: without this the first click on a card button is spent focusing the window.
+final class FirstClickHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }

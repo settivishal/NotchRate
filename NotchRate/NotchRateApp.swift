@@ -110,7 +110,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         state.onBlobChange = { [weak self] in self?.syncBlobs() }
         panel = NotchPanel()
         let view = { [unowned self] (part: NotchView.Part) in
-            NSHostingView(rootView: NotchView(part: part, store: store, state: state,
+            FirstClickHostingView(rootView: NotchView(part: part, store: store, state: state,
                                               setExpanded: { [weak self] in self?.setExpanded($0) },
                                               setPage: { [weak self] in self?.setPage($0) },
                                               refresh: { [weak self] in self?.refresh() },

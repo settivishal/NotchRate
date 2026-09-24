@@ -13,24 +13,33 @@ enum History {
     static var file = FileManager.default.homeDirectoryForCurrentUser.appending(path: ".notch-usage/history.jsonl")
     static let keepDays = 8.0
     private static var last: Sample?
+    private static var cache: (stamp: Date, rows: [Sample])?  // decoded file, keyed by its modification date
 
     /// Skip rows that add nothing: same values within 5 minutes of the previous row.
     static func append(_ snap: UsageSnapshot) {
         let row = Sample(ts: snap.lastUpdated, s: snap.sessionUsedPct, w: snap.weeklyUsedPct, c: snap.costUsd)
         if let last, last.s == row.s, last.w == row.w, last.c == row.c, row.ts - last.ts < 300 { return }
         last = row
-        guard let data = try? JSONEncoder().encode(row) else { return }
+        guard let line = try? JSONEncoder().encode(row) + Data("\n".utf8) else { return }
         if let h = try? FileHandle(forWritingTo: file) {
-            h.seekToEndOfFile(); h.write(data + Data("\n".utf8)); try? h.close()
+            h.seekToEndOfFile(); h.write(line); try? h.close()
         } else {
-            try? data.write(to: file)
+            try? line.write(to: file)  // newline too, or the next row would glue onto this one
         }
     }
 
+    /// The open card re-renders every second while a timer runs; only re-read the file when it changed.
     static func load(now: Date = .now) -> [Sample] {
-        guard let text = try? String(contentsOf: file, encoding: .utf8) else { return [] }
+        let stamp = (try? FileManager.default.attributesOfItem(atPath: file.path))?[.modificationDate] as? Date
+        let rows: [Sample]
+        if let stamp, let cache, cache.stamp == stamp {
+            rows = cache.rows
+        } else {
+            guard let text = try? String(contentsOf: file, encoding: .utf8) else { return [] }
+            rows = text.split(separator: "\n").compactMap { try? JSONDecoder().decode(Sample.self, from: Data($0.utf8)) }
+            cache = stamp.map { ($0, rows) }
+        }
         let cutoff = now.timeIntervalSince1970 - keepDays * 86400
-        let rows = text.split(separator: "\n").compactMap { try? JSONDecoder().decode(Sample.self, from: Data($0.utf8)) }
         let kept = rows.filter { $0.ts >= cutoff }
         if kept.count < rows.count { prune(kept) }
         return kept
