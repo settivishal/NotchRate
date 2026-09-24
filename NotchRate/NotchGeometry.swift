@@ -10,11 +10,11 @@ struct NotchGeometry {
         let d = UserDefaults.standard
         return switch d.string(forKey: Pref.cardSize) {
         case "spacious": 1.25
-        case "custom": min(1.6, max(0.9, d.double(forKey: Pref.cardScale)))
+        case "custom": min(1.6, max(1, d.double(forKey: Pref.cardScale)))
         default: 1
         }
     }
-    static var expandedSize: CGSize { CGSize(width: 356 * scale, height: UserDefaults.standard.bool(forKey: Pref.ringGauges) ? 122 : 150) }
+    static var expandedSize: CGSize { CGSize(width: 380 * scale, height: UserDefaults.standard.bool(forKey: Pref.ringGauges) ? 122 : 150) }
 
     let screen: NSScreen
     let hasNotch: Bool

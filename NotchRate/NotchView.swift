@@ -210,7 +210,7 @@ struct NotchView: View {
                 case .approval: approvalPage(now: now)
                 }
             }
-            .padding(.horizontal, side)
+            .frame(width: size.width - 2 * side)  // a too-wide row sticks out alone instead of widening every row
             .padding(.bottom, NotchGeometry.cardMargin)
         }
         .frame(width: size.width, height: size.height, alignment: .top)
@@ -296,9 +296,7 @@ struct NotchView: View {
     private func approvalPage(now: Date) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             if let r = state.approval {
-                header {
-                    Text(now < r.expires ? "\(relative(r.expires.timeIntervalSince1970, now: now)) left" : "answer in terminal")
-                }
+                header(status: now < r.expires ? "\(relative(r.expires.timeIntervalSince1970, now: now)) left" : "answer in terminal")
                 HStack(spacing: 6) {
                     Image(systemName: r.isPlan ? "list.bullet.clipboard" : "exclamationmark.shield.fill").foregroundStyle(.orange)
                     Text(r.isPlan ? "Plan ready for review" : "\(r.tool) needs permission").font(.caption).bold()
@@ -380,7 +378,7 @@ struct NotchView: View {
     private func timerPage(now: Date, until: Date?, tint: Color, offIcon: String, status: String,
                            presets: [(String, TimeInterval)], set: @escaping (Date?) -> Void) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            header { Text(status) }
+            header(status: status)
             Text(until.map { $0 == .distantFuture ? "∞" : countdown($0, now: now) } ?? "OFF")
                 .font(.system(size: 32, weight: .bold, design: .rounded)).monospacedDigit()
                 .foregroundStyle(until != nil ? tint : .gray)
@@ -470,9 +468,8 @@ struct NotchView: View {
     private func expanded(_ snap: UsageSnapshot, level: Level, now: Date) -> some View {
         let stale = level == .stale
         return VStack(alignment: .leading, spacing: 12) {
-            header {
-                Text(stale ? "offline · \(relative(snap.lastUpdated, now: now)) ago"
-                     : now.timeIntervalSince1970 - snap.lastUpdated < 2 * max(30, pollSeconds) ? "live" : "updated \(relative(snap.lastUpdated, now: now)) ago")
+            header(status: stale ? "offline · \(relative(snap.lastUpdated, now: now)) ago"
+                   : now.timeIntervalSince1970 - snap.lastUpdated < 2 * max(30, pollSeconds) ? "live" : "updated \(relative(snap.lastUpdated, now: now)) ago") {
                 NavButton(icon: "arrow.clockwise", spinning: state.refreshing, action: refresh)
                 NavButton(icon: state.pinned ? "pin.fill" : "pin", action: togglePin)
             }
@@ -517,9 +514,22 @@ struct NotchView: View {
     }
 
     /// Title row: sub-page pills when the tab has several pages, else the page title.
-    private func header<Trailing: View>(@ViewBuilder trailing: () -> Trailing) -> some View {
+    /// Title row: sub-page pills when the tab has several pages, else the page title; then status text and
+    /// actions. The status text is dropped (kept as a tooltip) before the row can outgrow the card: an
+    /// overflowing row would widen every page past the silhouette.
+    private func header<Actions: View>(status: String? = nil, @ViewBuilder actions: () -> Actions) -> some View {
+        let actions = actions()
+        return ViewThatFits(in: .horizontal) {
+            headerRow(status: status, actions: actions)
+            headerRow(status: nil, actions: actions).help(status ?? "")
+        }
+    }
+
+    private func header(status: String? = nil) -> some View { header(status: status) { EmptyView() } }
+
+    private func headerRow(status: String?, actions: some View) -> some View {
         let pages = state.page.tab.pages
-        return HStack(spacing: 8) {
+        return HStack(spacing: 6) {
             if pages.count > 1, pages.contains(state.page) {
                 ForEach(pages, id: \.self) { p in
                     NavButton(label: p.title, tint: state.page == p ? .white : nil) { setPage(p) }
@@ -527,8 +537,9 @@ struct NotchView: View {
             } else {
                 Text(state.page.title).font(.headline)
             }
-            Spacer()
-            trailing().font(.caption).foregroundStyle(.gray)
+            Spacer(minLength: 4)
+            if let status { Text(status).font(.caption).foregroundStyle(.gray).lineLimit(1) }
+            actions
         }
     }
 
@@ -542,7 +553,7 @@ struct NotchView: View {
         let stats = WeekStats(rows, weeklyResetsAt: snap.weeklyResetsAt, now: now)
         let inWindow = rows.filter { $0.ts >= now.timeIntervalSince1970 - 7 * 86400 }.count
         return VStack(alignment: .leading, spacing: 4) {
-            header { EmptyView() }
+            header()
             label("Session", s, resets: snap.sessionResetsAt, now: now,
                   detail: sRate > 0 ? "\(Int(sRate.rounded()))%/h · full in ~\(hours((100 - s) / sRate)) · +\(Int(used.rounded()))% this window" : "idle · +\(Int(used.rounded()))% this window")
             chart(rows, \.s, hours: 5, pct: s, now: now)
@@ -610,9 +621,7 @@ struct NotchView: View {
         let stats = WeekStats(History.load(now: now), weeklyResetsAt: snap.weeklyResetsAt, now: now)
         let today = Calendar.current.startOfDay(for: now)
         return VStack(alignment: .leading, spacing: 12) {
-            header {
-                if let r = snap.weeklyResetsAt { Text("resets \(resetText(r, now: now))") }
-            }
+            header(status: snap.weeklyResetsAt.map { "resets \(resetText($0, now: now))" })
             Chart(stats.daily, id: \.day) { d in
                 BarMark(x: .value("day", d.day, unit: .day), y: .value("%", d.pct))
                     .foregroundStyle(d.day == today ? Color.accentColor : .white.opacity(0.35))
@@ -650,7 +659,7 @@ struct NotchView: View {
     /// What the logged tokens would cost at API list prices, with where it went and a 13-week activity map.
     private func spendPage(now: Date) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            header { Text("API value · est.") }
+            header(status: "API value · est.")
             if let s = state.spend {
                 HStack {
                     stat("Today", s.today)

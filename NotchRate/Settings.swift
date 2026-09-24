@@ -26,7 +26,7 @@ enum Pref {
     static let hideFullscreen = "hideFullscreen" // Bool, default false: hide the badge while an app is full screen on its display
     static let haptics = "haptics"             // Bool, default true: trackpad tap when hover opens the card
     static let cardSize = "cardSize"           // String, default "compact": compact / spacious / custom card preset
-    static let cardScale = "cardScale"         // Double, default 1.25: custom preset scale, 0.9–1.6
+    static let cardScale = "cardScale"         // Double, default 1.25: custom preset scale, 1–1.6
     static let finishNotify = "finishNotify"   // Double seconds, default 60: notify when a Claude turn this long finishes; -1 off
 
     static func register() {
@@ -103,7 +103,7 @@ struct SettingsView: View {
                 .pickerStyle(.segmented)
                 .onChange(of: cardSize) { AppDelegate.shared?.flashPreview() }
                 if cardSize == "custom" {
-                    Slider(value: $cardScale, in: 0.9...1.6, step: 0.05) {
+                    Slider(value: $cardScale, in: 1...1.6, step: 0.05) {
                         Text("Scale: \(Int((cardScale * 100).rounded()))%")
                     } onEditingChanged: { AppDelegate.shared?.preview($0) }
                 }
