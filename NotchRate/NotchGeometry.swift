@@ -4,7 +4,7 @@ import AppKit
 /// shape merges with it. No notch: a small pill hugging the menu bar.
 struct NotchGeometry {
     static var pillWidth: CGFloat { UserDefaults.standard.bool(forKey: Pref.showWeekly) ? 160 : 130 }
-    static var expandedSize: CGSize { CGSize(width: 340, height: UserDefaults.standard.bool(forKey: Pref.ringGauges) ? 122 : 150) }
+    static var expandedSize: CGSize { CGSize(width: 356, height: UserDefaults.standard.bool(forKey: Pref.ringGauges) ? 122 : 150) }
 
     let screen: NSScreen
     let hasNotch: Bool
@@ -25,6 +25,7 @@ struct NotchGeometry {
     }
 
     static let tabBar: CGFloat = 56  // 32pt pills + 12pt above and below
+    static let cardMargin: CGFloat = 16  // visible black margin around card content, sides and bottom
 
     static let blobGap: CGFloat = 8
     var blobWidth: CGFloat { topHeight }  // iOS-style side activity: a circle as tall as the notch
@@ -49,7 +50,7 @@ struct NotchGeometry {
         case .spend: CGSize(width: Self.expandedSize.width, height: 230)
         case .caffeine, .focus: CGSize(width: Self.expandedSize.width, height: Self.expandedSize.height + 24)  // same as overview
         }
-        return CGSize(width: max(card.width, collapsedSize(blob: true).width), height: topHeight + card.height + Self.tabBar)
+        return CGSize(width: max(card.width, collapsedSize(blob: true).width), height: topHeight + card.height + Self.tabBar + 4)  // +4: 16pt bottom margin (was 12)
     }
 
     /// Top-center frame for a window of `size` on this screen.

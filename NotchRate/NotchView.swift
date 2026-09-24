@@ -188,22 +188,28 @@ struct NotchView: View {
         let geo = state.geometry
         let size = geo.expandedSize(for: state.page, tall: state.tallCard, plan: state.approval?.isPlan == true)
         let snap = store.primary  // Claude pages need usage data; the other tabs do not
+        // Even black margin all round: the sides also clear the shoulder flare at the top corners.
+        let side = NotchShape.forHeight(size.height, notch: geo.hasNotch, cardRadius: cardRadius).topRadius + NotchGeometry.cardMargin
         return VStack(spacing: 0) {
             // Tab bar sits right under the notch: the card resizes from the bottom, so the
             // cursor stays inside while switching pages (a bottom bar slid out from under it).
             Color.clear.frame(height: geo.topHeight)
-            tabBar
-            switch state.page {
-            case .overview where snap != nil: expanded(snap!, level: snap!.level(now: now, staleAfter: staleHours * 3600), now: now)
-            case .trends where snap != nil: trends(snap!, now: now)
-            case .week where snap != nil: week(snap!, now: now)
-            case .spend: spendPage(now: now)
-            case .overview, .trends, .week:
-                Text("No usage data yet").font(.caption).foregroundStyle(.secondary).frame(maxHeight: .infinity)
-            case .caffeine: caffeinePage(now: now)
-            case .focus: focusPage(now: now)
-            case .approval: approvalPage(now: now)
+            tabBar(inset: side)
+            Group {
+                switch state.page {
+                case .overview where snap != nil: expanded(snap!, level: snap!.level(now: now, staleAfter: staleHours * 3600), now: now)
+                case .trends where snap != nil: trends(snap!, now: now)
+                case .week where snap != nil: week(snap!, now: now)
+                case .spend: spendPage(now: now)
+                case .overview, .trends, .week:
+                    Text("No usage data yet").font(.caption).foregroundStyle(.secondary).frame(maxHeight: .infinity)
+                case .caffeine: caffeinePage(now: now)
+                case .focus: focusPage(now: now)
+                case .approval: approvalPage(now: now)
+                }
             }
+            .padding(.horizontal, side)
+            .padding(.bottom, NotchGeometry.cardMargin)
         }
         .frame(width: size.width, height: size.height, alignment: .top)
         .animation(Motion.card, value: state.page)
@@ -322,15 +328,13 @@ struct NotchView: View {
                 Text("Nothing pending").font(.caption).foregroundStyle(.secondary)
             }
         }
-        .padding(.horizontal, 22)
-        .padding(.bottom, 12)
         .foregroundStyle(.white)
         .transition(.opacity)
     }
 
     // MARK: tab bar + caffeinate
 
-    private var tabBar: some View {
+    private func tabBar(inset: CGFloat) -> some View {
         HStack(spacing: 8) {
             ForEach(Tab.allCases, id: \.self) { t in
                 // Running timers glow on every tab so the state is visible from Claude too.
@@ -345,7 +349,7 @@ struct NotchView: View {
         .overlay(alignment: .leading) {  // logo in the corner, aligned with the page margin
             Image(nsImage: Brand.glyph).renderingMode(.template).resizable().scaledToFit().frame(height: 16)
                 .foregroundStyle(.white.opacity(0.85))
-                .padding(.leading, 22)
+                .padding(.leading, inset)
         }
     }
 
@@ -390,8 +394,6 @@ struct NotchView: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .padding(.horizontal, 22)
-        .padding(.bottom, 12)
         .foregroundStyle(.white)
         .transition(.opacity)
     }
@@ -507,8 +509,6 @@ struct NotchView: View {
             }
             .font(.caption).foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 22)
-        .padding(.bottom, 12)
         .foregroundStyle(.white)
         .opacity(stale ? 0.6 : 1)
         .transition(.opacity)
@@ -552,8 +552,6 @@ struct NotchView: View {
                 Text("collecting data · \(inWindow) samples").font(.caption2).foregroundStyle(.gray)
             }
         }
-        .padding(.horizontal, 22)
-        .padding(.bottom, 12)
         .foregroundStyle(.white)
         .transition(.opacity)
     }
@@ -641,8 +639,6 @@ struct NotchView: View {
             }
             .font(.caption).foregroundStyle(.secondary)
         }
-        .padding(.horizontal, 22)
-        .padding(.bottom, 12)
         .foregroundStyle(.white)
         .transition(.opacity)
     }
@@ -673,8 +669,6 @@ struct NotchView: View {
                 Text("Reading Claude Code logs…").font(.caption).foregroundStyle(.secondary).frame(maxHeight: .infinity)
             }
         }
-        .padding(.horizontal, 22)
-        .padding(.bottom, 12)
         .foregroundStyle(.white)
         .transition(.opacity)
     }
